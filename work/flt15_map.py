@@ -114,7 +114,8 @@ def global_map(center=None):
                                          ('chile', OK, f"orbit 7 → landing {fmt(TR['chile']['t_splash'])}", 2.5, 2.0, 'left', 'bottom'), ('hawaii2', VIOLET, f"orbit 14 → splash {fmt(TR['hawaii2']['t_splash'])}", 2.5, -2.2, 'left', 'top')]:
         tr = TR[k]; sx = float(Wf(tr['splash'][0])); starm(ax, sx, tr['splash'][1], col, ms=14, hollow=True); lab(ax, sx + dx, tr['splash'][1] + dy, txt, ha=ha, va=va)
         flip = center is not None and k in ('hawaii1', 'hawaii2')       # these burns sit near the Pacific view's right edge
-        sqm(ax, float(Wf(tr['burn'][0])), tr['burn'][1], col, f"burn {fmt(tr['t_burn'])}" if tr['t_burn'] else None, dx=(-1.8 if flip else 1.8), ha=('right' if flip else 'left'), dy=(-1.5 if k == 'hawaii1' else 1.2), va=('top' if k == 'hawaii1' else 'bottom'))
+        below = k == 'hawaii1' and not flip                               # the orbit-2 burn label goes under its square, except in the Pacific view
+        sqm(ax, float(Wf(tr['burn'][0])), tr['burn'][1], col, f"burn {fmt(tr['t_burn'])}" if tr['t_burn'] else None, dx=(-1.8 if flip else 1.8), ha=('right' if flip else 'left'), dy=(-1.5 if below else 1.2), va=('top' if below else 'bottom'))
     starm(ax, SBx, F.STARBASE[1], INK, ms=18)
     hud(ax, [('STARSHIP FLIGHT 15 · first ship catch', FG, True),
              (f'i = {orbit.inc:.2f}°   h = 275 km   nodal period {orbit.T_nodal:.2f} min', FG, False),

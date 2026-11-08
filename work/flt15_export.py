@@ -85,7 +85,7 @@ CITIES = [['Houston', -95.37, 29.76, 1], ['San Antonio', -98.49, 29.42, 1], ['Da
           ['South Padre Island', -97.17, 26.11, 3], ['Harlingen', -97.70, 26.19, 3], ['Port Isabel', -97.21, 26.07, 3], ['Kingsville', -97.86, 27.52, 3], ['Victoria', -97.00, 28.81, 3],
           ['Ciudad Victoria', -99.15, 23.74, 3], ['Piedras Negras', -100.52, 28.70, 3], ['Hermosillo', -110.96, 29.07, 2], ['Culiacán', -107.39, 24.80, 3], ['Torreón', -103.44, 25.54, 3]]
 seen = set(); CITIES = [c for c in CITIES if not (c[0] in seen or seen.add(c[0]))]
-VIEWS = [['Global', -110, 15, 3.6], ['Starbase', -97.155, 25.7, 1.10], ['Approach', -102, 27.5, 1.45], ['Pacific entry', -150, 20, 2.4], ['Deorbit burn', 60, -25, 2.6]]
+VIEWS = [['Global', -110, 0, 3.6], ['Starbase', -97.155, 25.7, 1.10], ['Approach', -102, 27.5, 1.45], ['Pacific entry', -150, 20, 2.4], ['Deorbit burn', 60, -25, 2.6]]
 NOTES_COMMON = [
     'Pre-launch model, not telemetry and not an official ephemeris. Window 22:45-00:00 UTC on 13-14 Nov 2026 (16:45-18:00 CST), from the SpaceX mission page; T0 22:45 is the window open, not an announced liftoff time.',
     "Orbit plane: Flight 14's fit to the September 2026 navigational warnings (i 30.58 deg, 275 km circular with J2 secular rates, node 2.1 deg east of the pad, the ascent steering into the plane). SpaceX: Flight 15 flies the same altitude and inclination. The orbital rate is scaled by %+.4f (nodal period %.3f min, as a %.0f km mean orbit) so that the modeled catch happens at the official T+22:32:34; Flight 14's deorbit telemetry read 270 km against that model's 275." % (orbit.period_scale, orbit.T_nodal, O.RA*(1/(1 + orbit.period_scale))**(2/3) - F.RE),
@@ -133,9 +133,10 @@ def mission(mid, mission_label, menu_label, desc_key, tracks, segments, events, 
                 met_default=met_default, insertion_met=float(T['ins0']), period_s=float(orbit.T_nodal*60), orbit_revolutions=(orbit_end - T['ins0'])/(orbit.T_nodal*60),
                 orbit_end_met=float(orbit_end), inc=round(float(orbit.inc), 4), perigee_km=O.H_ORBIT, apogee_km=O.H_ORBIT, az=100.0,
                 s4_cutoff_met=float(T['seco']), cutoff_label='SECO', stack=STACK, companion=COMPANION, extra_cities=CITIES, observer_home='South Padre Island',
-                local_time=dict(label='CST', offset_h=-6), model_badge='Pre-launch model', readme_url='https://github.com/exoplanet5/Starship-FLT15#limitations', zone_noun='hazard area', layer_labels=dict(falls='Booster · other descents', zones='Hazard areas'),
+                local_time=dict(label='CST', offset_h=-6), model_badge='Pre-launch model', readme_url='https://github.com/exoplanet5/Starship-FLT15#limitations', track_window=dict(track='orbit', revolutions=2), zone_noun='hazard area', layer_labels=dict(falls='Booster · other descents', zones='Hazard areas'),
                 flight_segments=segments, powered_intervals=powered, phases=phases, views=VIEWS,
                 visibility=dict(extent=[-125, -75, 10, 40], grid_step_deg=0.5, time_step_s=5, levels=[10]), about=about, notes=notes)
+    if globals().get('_NO_WINDOW'): meta.pop('track_window', None)
     data = dict(schema_version=1, meta=meta, tracks=tracks, zones=zones, events=sorted(events, key=lambda e: e['met']),
                 tle_ref=dict(t0=TLE['t0'], raan_rate_deg_per_min=TLE['raan_rate_deg_per_min'], sets=[dict(name=TLE['name'], l1=TLE['l1'], l2=TLE['l2'])]), sun=SUN, moon=MOON)
     out = OUT/f'{mid}.json'; out.write_text(json.dumps(data, separators=(',', ':'), ensure_ascii=False))
@@ -152,6 +153,7 @@ ABOUT = ["Pre-launch model: Flight 14's zone-fitted orbit with the Flight 15 tim
          'Hazard areas are the Flight 14 warnings; Flight 15 warnings were not yet published, so their windows are re-timed model values.',
          'WGS84 geometry · JPL DE440s sunlight.']
 registry = []
+_NO_WINDOW = False
 # ---- nominal: return to launch site
 n = TR['nominal']
 tracks = dict(ascent=ASCENT, coast=COAST, orbit=orbit_track(T['deorb0']), descent=DESC['nominal'], booster=BOOSTER, **{k: DASHED[k] for k in ['indian', 'hawaii1', 'chile', 'hawaii2']})
@@ -182,6 +184,7 @@ def contingency(mid, mission_label, menu_label, key, burn_label, land_label, lan
         orbit_end_eff = t_burn
     zones = zones_for(Z.ZONES[[z['key'] for z in Z.ZONES].index({'indian': 'indian', 'hawaii1': 'npac1', 'chile': 'chile', 'hawaii2': 'late'}[key])]['key'], (tr['t_splash'], tr['splash'][0], tr['splash'][1]))
     about = [f'Contingency profile: {mission_label}. ' + ABOUT[0]] + ABOUT[1:]
+    global _NO_WINDOW; _NO_WINDOW = key == 'indian'
     m = mission(mid, mission_label, menu_label, key, tracks, segs, events, zones, powered, phases, orbit_end_eff if orbit_end_eff else tracks['descent']['met0'] + (len(tracks['descent']['lon']) - 1)*tracks['descent']['dt'], about, NOTES_COMMON + extra_notes)
     return m
 # the Indian case has no orbit: insertion_met is set to SECO by overriding after the fact is awkward, so handle it inside mission(): use orbit_end = flight end

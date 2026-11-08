@@ -18,7 +18,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[role=button]:focu
 #clock{display:flex;gap:12px;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}#clock .k{color:var(--dim)}#c-met{font-weight:600}
 .btn{border:1px solid var(--border);background:var(--surface);border-radius:4px;padding:5px 8px;cursor:pointer;white-space:nowrap;min-height:30px}
 .btn:hover{border-color:var(--accent-dim)}.btn.on{border-color:var(--accent);background:var(--input)}.btn.primary{background:var(--accent-dim);min-width:85px}.btn:disabled{opacity:.5;cursor:default}
-#bar .tog{min-width:32px;font-size:16px}.btns{display:flex;flex-wrap:wrap;gap:6px}
+#bar .tog{min-width:32px;font-size:16px}.btns{display:flex;flex-wrap:wrap;gap:6px}#frames{display:flex;gap:4px;flex:none}#frames .btn{font-size:10px;padding:3px 7px;min-height:24px;letter-spacing:.04em}
 #view{position:fixed;inset:calc(var(--bar) + env(safe-area-inset-top,0px)) 0 0}#view canvas{display:block;outline:none}
 #leftcol{position:fixed;left:var(--gutter);top:calc(var(--bar) + env(safe-area-inset-top,0px) + 16px);bottom:calc(46px + env(safe-area-inset-bottom,0px));width:310px;display:flex;flex-direction:column;gap:10px;z-index:20;pointer-events:none}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.4);backdrop-filter:blur(5px);pointer-events:auto;min-height:0}
@@ -34,14 +34,14 @@ table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:ta
 #jelly td:first-child{color:var(--dim);width:135px}#viewers tr.dark td{font-weight:700;color:var(--sun)}#viewers tr.dark .time-jump{color:var(--sun);font-weight:700}#viewers tr.day td{opacity:.55}details{margin-block:8px}summary{cursor:pointer}#events{font-size:10px}#events td{padding-block:6px}#events tr.past{opacity:.55}#events tr.next{background:var(--surface)}.time-jump{background:none;border:0;padding:0;color:var(--fg);cursor:pointer;font:inherit;white-space:nowrap;text-decoration:underline;text-decoration-color:var(--dim);text-underline-offset:3px}
 #t0presets .btn,#views .btn{font-size:11px;padding-inline:6px}#tle{max-width:100%;font-size:10px;line-height:1.5;white-space:pre;overflow:auto;background:var(--input);border:1px solid var(--border);padding:8px;border-radius:4px}
 .no-jelly .jelly-only{display:none}
-#legend{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:9px;pointer-events:auto}#legend>div{display:flex;justify-content:space-between;gap:8px}#legend>div+div{margin-top:5px}#legend span{white-space:nowrap}#legend i{display:inline-block;width:14px;border-top:2px solid var(--fg);vertical-align:3px;margin-right:4px}#legend i.d{border-top-style:dashed}
+#legend{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:9px;pointer-events:auto}#legend>div{display:flex;flex-wrap:wrap;gap:4px 10px}#legend>div+div{margin-top:4px}#legend span{white-space:nowrap}#legend i{display:inline-block;width:14px;border-top:2px solid var(--fg);vertical-align:3px;margin-right:4px}#legend i.d{border-top-style:dashed}
 .sky-mark{position:fixed;left:0;top:0;z-index:12;display:flex;align-items:center;gap:5px;font-size:10px;pointer-events:none;text-shadow:0 0 4px var(--halo),0 0 2px var(--halo)}.sky-mark i{display:none}.sky-mark.edge i{display:block;width:0;height:0;border-left:7px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent}.sky-mark.sun{color:var(--sun)}.sky-mark.moon{color:#cfd6dd}#notice{position:fixed;left:50%;transform:translateX(-50%);bottom:45px;max-width:min(560px,calc(100vw - 32px));z-index:40;background:var(--panel);padding:8px 12px;border-radius:5px;pointer-events:none}#notice:empty{display:none}
 #inspect{position:fixed;z-index:25;pointer-events:none;white-space:pre-line;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:7px 9px;font-size:11px}
 .lbl{font:11px/1.4 var(--mono);color:var(--fg);white-space:pre;pointer-events:none;padding-left:10px;text-shadow:0 0 3px var(--halo),0 0 3px var(--halo),0 0 2px var(--halo),0 0 1px var(--halo)}.lbl.small,.lbl.zone{font-size:10px}.lbl.below{padding-top:48px;padding-left:0}.lbl.city{font-size:10px;padding-left:6px;pointer-events:auto;cursor:pointer}.lbl.vehicle{padding-bottom:36px}
 #credit{position:fixed;right:var(--right);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:15;font-size:9px;color:var(--dim);text-shadow:0 0 3px var(--halo);pointer-events:none}
 #loading{position:fixed;inset:0;background:var(--space);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding-inline:var(--gutter) var(--right);z-index:50;text-align:center}#loading b{color:var(--accent)}#loadmsg{max-width:50ch;color:var(--dim)}
 @media(max-width:1100px){#subt,.cst{display:none}#info{width:310px}#leftcol{width:290px}#legend{font-size:8.5px}}
-@media(max-width:860px){#bar{gap:9px}.cst,#ttlsub{display:none}#leftcol{display:contents}#ctl,#info{position:fixed;inset:calc(var(--bar) + env(safe-area-inset-top,0px) + 12px) var(--right) auto var(--gutter);width:auto;max-height:calc(100dvh - var(--bar) - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}body:not(.ctl-open) #ctl{display:none}#legend{display:none}#credit{left:var(--gutter);right:var(--right);font-size:8px}#ctl .btn{min-height:36px}#clock{gap:8px}}
+@media(max-width:860px){#bar{gap:9px}.cst,#ttlsub,#frames{display:none}#leftcol{display:contents}#ctl,#info{position:fixed;inset:calc(var(--bar) + env(safe-area-inset-top,0px) + 12px) var(--right) auto var(--gutter);width:auto;max-height:calc(100dvh - var(--bar) - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}body:not(.ctl-open) #ctl{display:none}#legend{display:none}#credit{left:var(--gutter);right:var(--right);font-size:8px}#ctl .btn{min-height:36px}#clock{gap:8px}}
 @media(max-width:520px){.utcd .k{display:none}#clock{gap:6px;font-size:clamp(8.5px,2.8vw,11px)}.title{font-size:12px}#bar .tog{padding-inline:7px}}
 @media(max-width:360px){#bar{gap:6px}.title{font-size:11px}}
 </style>
@@ -50,7 +50,7 @@ table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:ta
 <body>
 <header id="bar">
 <button class="btn tog" data-panel="ctl" aria-label="Toggle controls" aria-controls="ctl">☰</button>
-<div class="title"><span id="ttl">Starship Flight 15</span><span id="ttlsub"></span></div><div id="subt"></div>
+<div class="title"><span id="ttl">Starship Flight 15</span><span id="ttlsub"></span></div><div id="frames" role="group" aria-label="Reference frame of the drawn paths"><button class="btn" data-frame="ecef" title="Earth-fixed frame (ECEF): paths as ground tracks over the turning Earth">ECEF</button><button class="btn" data-frame="gcrs" title="Inertial frame (GCRS, pole-aligned): the orbit stays put and the Earth turns under it">GCRS</button></div><div id="subt"></div>
 <div id="clock"><span class="utcd"><span class="k">UTC</span> <span id="c-date">—</span></span><span class="utct"><span id="c-utc">—</span>Z</span><span id="c-met">T+00:05:00</span><span class="cst"><span class="k" id="c-zone">CST</span> <span id="c-cst">—</span></span></div>
 <button class="btn tog" data-panel="info" aria-label="Toggle flight information" aria-controls="info">ⓘ</button>
 </header>
@@ -60,6 +60,7 @@ table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:ta
 <h2>Launch configuration</h2>
 <div class="row"><label class="k" for="profilesel">Profile</label><select id="profilesel"></select></div>
 <div class="row"><label class="k" for="launchsel">Mission</label><select id="launchsel"></select></div>
+<div class="row"><span class="k">Frame</span><div class="btns" id="frames2" role="group" aria-label="Reference frame of the drawn paths"><button class="btn" data-frame="ecef" title="Earth-fixed frame (ECEF)">ECEF</button><button class="btn" data-frame="gcrs" title="Inertial frame (GCRS): the Earth turns under a fixed orbit">GCRS</button></div></div>
 <div id="profile-summary"></div>
 <h2>Launch time · UTC</h2>
 <div class="row"><span class="k">Date</span><span id="datev"></span></div>

@@ -118,7 +118,12 @@ sunlit), the booster as a plain stage with its own moving marker (template field
 with a descent (`meta.orbit_end_met`); all three were added to the template for this mission. Vehicle status, hazard-area
 table (impact times only for the profile shown), timeline with official and model events, synthetic TLE for the
 chosen T0, sky chart from any city or clicked point (home: South Padre Island), terminators, city lights, borders.
-URL state: `?profile=starship-275&mission=flt15-rtls&t0=22:45:00&met=81000&cam=-97.2,26,1.1`.
+The title bar switches the reference frame: **ECEF** draws the paths over the Earth-fixed globe; **GCRS** holds the orbit
+fixed in inertial space and turns the Earth under it (the viewer's longitude drifts at the sidereal rate; the frame is
+pole-aligned, GCRS up to a constant rotation about the pole). Only two revolutions of the orbit are drawn, centred on
+the current time and sliding with playback, so the globe stays readable; the Global preset looks at the equator. Changing
+the mission keeps the camera, frame, T0 and MET.
+URL state: `?profile=starship-275&mission=flt15-rtls&t0=22:45:00&met=81000&cam=-97.2,26,1.1&frame=gcrs`.
 
 ## Limitations
 

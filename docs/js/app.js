@@ -42,7 +42,12 @@ async function start() {
   const requestedT0=clockSeconds(qs.get('t0'));
   const state = {date:M.date,t0:Number.isFinite(requestedT0)?clamp(requestedT0,t0Min,t0Max):clockSeconds(M.t0_default),
     met:num('met',M.met_default??300,metMin,MET_END),follow:qs.get('follow')==='1',playing:false,live:false,speed:num('speed',10,1,300),
+    frame:qs.get('frame')==='gcrs'?'gcrs':'ecef',
     show:Object.fromEntries(['term','zones','labels','gt','jelly','vis','falls','sky','grid','lights','cities','fp','borders'].map((k)=>[k,qs.get(k)!=='0']))};
+  // Reference frame of the drawn paths. ECEF: the Earth-fixed scene as it is. GCRS: paths are rotated to the inertial frame (the ECEF frame at
+  // liftoff turned by the sidereal rate), the path group turns back by -OMEGA*MET so the vehicle stays over its sub-point, and the camera's
+  // anchor longitude drifts westward at the sidereal rate, so the viewer is fixed in inertial space and the Earth turns under a fixed orbit.
+  const OMEGA=7.2921158553e-5,dRot=(met)=>state.frame==='gcrs'?OMEGA*met:0,rotY=(p,a)=>{if(!a)return p;const c=Math.cos(a),s=Math.sin(a);return [p[0]*c+p[2]*s,p[1],-p[0]*s+p[2]*c];};
   const t0ms=()=>A.dateT0ms(M.date,state.t0), phaseOf=(met)=>(M.phases.find((p)=>met<p.until)||M.phases.at(-1)).label;
   function styleAt(met,T0) {
     const s=shipAt(met),lit=sunlightClearance(s.p,sunAt(T0+met*1000))>0,powered=poweredAt(met);
@@ -75,14 +80,14 @@ async function start() {
   const camera=new THREE.PerspectiveCamera(35,1,0.005,200);
   // Google Earth-style camera: left-drag grabs the globe, right-drag or two fingers tilt and turn about the view point.
   const cam=new GlobeCamera(camera,renderer.domElement,{onClick:(x,y)=>pick(x,y),onGesture:(kind)=>{if(kind==='drag')setFollow(false);}});
-  const materials=new Set(), Y=new THREE.Vector3(0,1,0);
+  const materials=new Set(), Y=new THREE.Vector3(0,1,0), _wp=new THREE.Vector3();
   function line(flat,{color=C.ink,width=1.8,opacity=1,dashed=false}={}) {
     const g=new LineGeometry();g.setPositions(flat);
     const m=new LineMaterial({color,linewidth:width,transparent:opacity<1||dashed,opacity,dashed,dashSize:.008,gapSize:.006,depthTest:true});
     m.resolution.set(view.clientWidth,view.clientHeight); materials.add(m);
     const l=new Line2(g,m);if(dashed)l.computeLineDistances();return l;
   }
-  function group() {const g=new THREE.Group();scene.add(g);return g;}
+  function group(parent=scene) {const g=new THREE.Group();parent.add(g);return g;}
   function clear(g) {
     g.traverse((o)=>{o.geometry?.dispose();if(o.material){materials.delete(o.material);o.material.dispose();}if(o.isCSS2DObject)o.element.remove();});g.clear();
   }
@@ -167,20 +172,28 @@ async function start() {
   // Screen-space graticule: 10° meridians and parallels stay one pixel wide at every zoom.
   const gridGroup=group(),gridLines=[];for(let lon=-180;lon<180;lon+=10)gridLines.push([[lon,-90],[lon,90]]);for(let lat=-80;lat<=80;lat+=10)gridLines.push([-180,-90,0,90,180].map((lon)=>[lon,lat]));
   const gridMat=new LineMaterial({color:'#ffffff',linewidth:1,transparent:true,opacity:.16,depthWrite:false});materials.add(gridMat);gridGroup.add(new LineSegments2(new LineSegmentsGeometry().setPositions(boundarySegments(gridLines,1,1.0003)),gridMat));
-  const fallGroup=group(),zoneGroup=group(),zoneLabels=group(),trajGroup=group(),gtGroup=group(),eventGroup=group(),jellyGroup=group(),cityGroup=group();
-  const PAD=A.llToVec(...M.pad),pad=sprite(squareTex,.021);pad.position.set(...PAD.map((v)=>v*1.002));scene.add(pad);
+  const pathRoot=group(),fallGroup=group(pathRoot),zoneGroup=group(),zoneLabels=group(),trajGroup=group(pathRoot),gtGroup=group(pathRoot),eventGroup=group(pathRoot),jellyGroup=group(pathRoot),cityGroup=group();
+  const PAD=A.llToVec(...M.pad),pad=sprite(squareTex,.021);pad.position.set(...PAD.map((v)=>v*1.002));scene.add(pad);let padLabel=null;
   for(const z of data.zones){const pts=[];for(let i=0;i<z.ring.length-1;i++){const a=z.ring[i],b=z.ring[i+1],dl=((b[0]-a[0]+540)%360)-180,n=Math.max(1,Math.ceil(Math.max(Math.abs(dl),Math.abs(b[1]-a[1]))/.1));for(let j=0;j<n;j++)pts.push(...A.llToVec(a[0]+dl*j/n,a[1]+(b[1]-a[1])*j/n,1.0015));}pts.push(...A.llToVec(...z.ring.at(-1),1.0015));zoneGroup.add(fillMesh(z.ring,C.ink,.18),line(pts,{color:z.color,width:1.5}));
     const o=label(`${z.label??(z.role==='boosters'?'Booster':z.role)} ${M.zone_noun??'drop zone'}\n${z.id} · ${z.t0}–${z.t1} UTC`,'zone below');o.position.set(...A.llToVec(...z.centroid,1.002));zoneLabels.add(o);}
   for(const [name,lon,lat,tier] of ALL_CITIES){const p=A.llToVec(lon,lat,1.001),dot=sprite(dotTex,.007);dot.position.set(...p);dot.userData={tier,city:name};cityGroup.add(dot);const o=label(name,'city');o.position.set(...p);o.userData={tier,city:name};o.element.title=`Sky chart over ${name}`;o.element.tabIndex=0;o.element.setAttribute('role','button');o.element.addEventListener('click',(e)=>openSky({name,lon,lat},false,{x:e.clientX,y:e.clientY}));o.element.addEventListener('keydown',(e)=>{if(e.key==='Enter')openSky({name,lon,lat});});cityGroup.add(o);}
-  const pickup=sprite(starTex,.025),pickupLabel=label('','below');scene.add(pickup,pickupLabel);
+  const pickup=sprite(starTex,.025),pickupLabel=label('','below');pathRoot.add(pickup,pickupLabel);
+  // Track samples in the drawn frame: ECEF as stored, or each sample turned by the Earth's rotation since liftoff for the inertial view.
+  function trackPts(tr,i0,i1,ground){const out=[];for(let i=Math.max(0,i0);i<=Math.min(tr.n-1,i1);i++)out.push(...rotY(tr.pt(i,1,ground?0.0012*A.RE:null),dRot(tr.metAt(i))));return out;}
+  // Optional meta.track_window: draw only a window of that track, a number of revolutions long, centred on the current MET, instead of every pass.
+  const WIN=M.track_window&&T[M.track_window.track]?{key:M.track_window.track,tr:T[M.track_window.track],span:(M.track_window.revolutions??2)*M.period_s,i0:-1,line:null,gt:null}:null;
+  function updateWindow(force){if(!WIN)return;const tr=WIN.tr,n=Math.min(tr.n-1,Math.ceil(WIN.span/tr.dt)),step=Math.max(1,Math.floor(n/40));
+    const a=Math.max(0,Math.min(tr.n-1-n,Math.floor((state.met-WIN.span/2-tr.met0)/tr.dt)));if(!force&&Math.abs(a-WIN.i0)<step)return;WIN.i0=a;
+    for(const o of [WIN.line,WIN.gt])if(o){o.parent?.remove(o);o.geometry.dispose();materials.delete(o.material);o.material.dispose();}
+    const seg=data.tracks[WIN.key];WIN.line=line(trackPts(tr,a,a+n,false),{color:seg.color,width:1.8,dashed:!!seg.dashed});trajGroup.add(WIN.line);WIN.gt=line(trackPts(tr,a,a+n,true),{color:C.ink,width:1,opacity:.26});gtGroup.add(WIN.gt);}
   // Compact location pin: a solid teardrop whose tip sits on the clicked ground point.
   const siteTex=texture((g,s)=>{const r=s*.27,cx=s/2,cy=r+s*.05,tip=s*.97;g.beginPath();g.arc(cx,cy,r,Math.PI*.85,Math.PI*.15);g.quadraticCurveTo(cx+r*.62,cy+r*1.25,cx,tip);g.quadraticCurveTo(cx-r*.62,cy+r*1.25,cx-r*Math.cos(Math.PI*.15),cy+r*Math.sin(Math.PI*.15));g.closePath();g.fillStyle=C.accent;g.strokeStyle='#061018';g.lineWidth=s*.055;g.lineJoin='round';g.stroke();g.fill();g.fillStyle='#061018';g.beginPath();g.arc(cx,cy,r*.34,0,2*Math.PI);g.fill();},96);
   const siteMark=sprite(siteTex,.026);siteMark.center.set(.5,.02);siteMark.renderOrder=9;siteMark.material.depthTest=false;siteMark.visible=false;scene.add(siteMark);
   // Solid motors draw the bold sunlit arc; the small S4 plume stays thin, because it is far fainter.
   function buildJellyLayer(){clear(jellyGroup);let run=[],kind=null;
     const flush=()=>{if(run.length>=6){if(kind==='solid')jellyGroup.add(line(run,{color:C.sun,width:8,opacity:.16}),line(run,{color:C.sun,width:2.6}));else jellyGroup.add(line(run,{color:C.s4,width:1.9}));}run=[];};
-    for(let i=0;i<ASC.n;i++){const met=ASC.metAt(i),on=J.lit[i]&&poweredAt(met),k=met<=solidEnd?'solid':'s4';if(on){if(k!==kind){flush();kind=k;}run.push(...ASC.pt(i,1));}else flush();}flush();
-    if(J.pickup){pickup.position.set(...drawPoint(J.pickup));pickupLabel.position.copy(pickup.position);pickupLabel.element.textContent=`Sunlight pickup\n${A.fmtMET(J.pickup.met)} · ${J.pickup.alt.toFixed(1)} km`;}
+    for(let i=0;i<ASC.n;i++){const met=ASC.metAt(i),on=J.lit[i]&&poweredAt(met),k=met<=solidEnd?'solid':'s4';if(on){if(k!==kind){flush();kind=k;}run.push(...rotY(ASC.pt(i,1),dRot(met)));}else flush();}flush();
+    if(J.pickup){pickup.position.set(...rotY(drawPoint(J.pickup),dRot(J.pickup.met)));pickupLabel.position.copy(pickup.position);pickupLabel.element.textContent=`Sunlight pickup\n${A.fmtMET(J.pickup.met)} · ${J.pickup.alt.toFixed(1)} km`;}
   }
   // 10-degree jelly zones for this T0.  The shell's night clip is per pixel from the live Sun vector, so it ends exactly on the Sun 0 line.
   const visLayer=createZoneLayer(earthMat.uniforms.sunDir,{s4:'0.478, 0.851, 0.478'},hasJelly?M.visibility.extent:null);let zoneAt=null;
@@ -191,10 +204,11 @@ async function start() {
   function applyZones(Z){zones=Z;visLayer.setZones(Z);zoneShown++;dirty();}
   function buildZones(){if(!hasJelly)return;const T0=t0ms(),pickupMet=J.pickup?.met??0;viewers=viewerTable(M.jelly.cities,ASC,solidEnd,J,sunAt,T0,poweredAt);dirty();zoneVersion++;
     if(zoneWorker)zoneWorker.postMessage({version:zoneVersion,T0,pickupMet});else applyZones((zoneAt??=createJellyZones(M,ASC,poweredAt,sunAt))(T0,pickupMet));}
-  function buildTrajectory(){clear(trajGroup);clear(gtGroup);clear(eventGroup);clear(fallGroup);
-    const p=label(M.pad_name);p.position.copy(pad.position);eventGroup.add(p);
-    for(const [key,tr] of Object.entries(T)){const seg=data.tracks[key],on=M.flight_segments.includes(key);(on?trajGroup:fallGroup).add(line(tr.pts(1),{color:seg.color,width:on?1.8:1.2,dashed:!!seg.dashed}));if(on)gtGroup.add(line(tr.pts(1,0,tr.n-1,true),{color:C.ink,width:1,opacity:.26}));}
-    for(const e of data.events){if(!e.major || e.met===0)continue;const tr=e.track?T[e.track]:null,s=tr?tr.sample(e.met):shipAt(e.met);const p=drawPoint(s),dot=sprite(squareTex,.016);dot.position.set(...p);eventGroup.add(dot);const o=label(`${e.label}\n${A.fmtMET(e.met)}`,'small');o.position.set(...p);eventGroup.add(o);}
+  function buildTrajectory(){clear(trajGroup);clear(gtGroup);clear(eventGroup);clear(fallGroup);if(WIN){WIN.line=WIN.gt=null;WIN.i0=-1;}
+    if(padLabel){scene.remove(padLabel);padLabel.element.remove();}padLabel=label(M.pad_name);padLabel.position.copy(pad.position);scene.add(padLabel);   // Earth-fixed, so outside the path group
+    for(const [key,tr] of Object.entries(T)){if(WIN&&key===WIN.key)continue;const seg=data.tracks[key],on=M.flight_segments.includes(key);(on?trajGroup:fallGroup).add(line(trackPts(tr,0,tr.n-1,false),{color:seg.color,width:on?1.8:1.2,dashed:!!seg.dashed}));if(on)gtGroup.add(line(trackPts(tr,0,tr.n-1,true),{color:C.ink,width:1,opacity:.26}));}
+    updateWindow(true);
+    for(const e of data.events){if(!e.major || e.met===0)continue;const tr=e.track?T[e.track]:null,s=tr?tr.sample(e.met):shipAt(e.met);const p=rotY(drawPoint(s),dRot(e.met)),dot=sprite(squareTex,.016);dot.position.set(...p);eventGroup.add(dot);const o=label(`${e.label}\n${A.fmtMET(e.met)}`,'small');o.position.set(...p);eventGroup.add(o);}
     buildJellyLayer();
   }
   function onT0Change(){J=computeJelly(ASC,sunAt,t0ms());buildJellyLayer();clearTimeout(zoneTimer);zoneTimer=setTimeout(buildZones,120);dirty();}
@@ -234,7 +248,15 @@ async function start() {
   function option(select,value,text){const o=document.createElement('option');o.value=value;o.textContent=text;select.appendChild(o);}
   for(const p of index.profiles)option($('profilesel'),p.id,p.label);$('profilesel').value=profile.id;
   for(const m of profile.missions)option($('launchsel'),m.id,m.label);$('launchsel').value=entry.id;
-  function selectMission(p,m){const q=new URLSearchParams(location.search);q.set('profile',p);q.set('mission',m);for(const k of ['t0','met','cam','sky','follow'])q.delete(k);location.search=q;}
+  const camParam=()=>{const v=cam.get();return `${v.lon.toFixed(3)},${v.lat.toFixed(3)},${(1+v.range).toFixed(3)},${v.heading.toFixed(1)},${v.tilt.toFixed(1)}`;};
+  // Another mission keeps the view, frame, T0 and MET (the page clamps them to the new mission); the sky chart and follow mode are dropped.
+  function selectMission(p,m){const q=new URLSearchParams(location.search);q.set('profile',p);q.set('mission',m);for(const k of ['sky','follow'])q.delete(k);q.set('cam',camParam());q.set('frame',state.frame);q.set('t0',A.fmtHMS(t0ms()));q.set('met',state.met.toFixed(3));location.search=q;}
+  // In GCRS the camera rig turns rigidly about the pole by the Earth's rotation since the last frame, so the viewer stays fixed in inertial space
+  // without touching the zoom target or heading; a held pointer, a preset flight and follow mode pause the drift (the Earth stays where the user holds it).
+  let prevRot=null;
+  function driftCamera(){const now=dRot(state.met);if(state.frame==='gcrs'&&!cam.fly&&!state.follow&&!cam.pointers.size&&prevRot!==null&&now!==prevRot)cam.rotate(new THREE.Quaternion().setFromAxisAngle(Y,-(now-prevRot)));prevRot=now;}
+  function setFrame(f){if(f!==state.frame){state.frame=f;prevRot=null;buildTrajectory();dirty();}document.querySelectorAll('[data-frame]').forEach((b)=>b.classList.toggle('on',b.dataset.frame===state.frame));}
+  for(const id of ['frames','frames2']){const el=$(id);if(el)el.onclick=(e)=>{const f=e.target.closest('[data-frame]')?.dataset.frame;if(f)setFrame(f);};}setFrame(state.frame);
   $('profilesel').onchange=()=>{const p=index.profiles.find((p)=>p.id===$('profilesel').value);selectMission(p.id,p.default_mission);};
   $('launchsel').onchange=()=>selectMission(profile.id,$('launchsel').value);
   Object.assign($('t0'),{min:t0Min,max:t0Max,value:state.t0});Object.assign($('met'),{min:metMin,max:MET_END,value:state.met});
@@ -250,7 +272,7 @@ async function start() {
   for(const [k,text] of Object.entries(M.layer_labels??{})){const box=$('o-'+k);if(box)box.parentElement.lastChild.textContent=text;}
   $('o-follow').checked=state.follow;$('o-follow').onchange=()=>setFollow($('o-follow').checked);
   async function copyText(text,button){const old=button.textContent;let copied=false;try{await navigator.clipboard.writeText(text);copied=true;}catch{const box=document.createElement('textarea');box.value=text;document.body.appendChild(box);box.select();copied=document.execCommand('copy');box.remove();}button.textContent=copied?'Copied':'Copy unavailable';if(!copied)message('Clipboard unavailable. Select the TLE text or copy the browser address.');setTimeout(()=>{button.textContent=old;},1600);}
-  function shareURL(){const v=cam.get(),q=new URLSearchParams({profile:profile.id,mission:entry.id,t0:A.fmtHMS(t0ms()),met:state.met.toFixed(3),cam:`${v.lon.toFixed(3)},${v.lat.toFixed(3)},${(1+v.range).toFixed(3)},${v.heading.toFixed(1)},${v.tilt.toFixed(1)}`,follow:state.follow?'1':'0',speed:state.speed});for(const [k,v]of Object.entries(state.show))q.set(k,v?'1':'0');if(sky.isOpen()&&skySite)q.set('sky',`${skySite.lat.toFixed(4)},${skySite.lon.toFixed(4)}`);return `${location.origin}${location.pathname}?${q}`;}
+  function shareURL(){const q=new URLSearchParams({profile:profile.id,mission:entry.id,t0:A.fmtHMS(t0ms()),met:state.met.toFixed(3),cam:camParam(),frame:state.frame,follow:state.follow?'1':'0',speed:state.speed});for(const [k,v]of Object.entries(state.show))q.set(k,v?'1':'0');if(sky.isOpen()&&skySite)q.set('sky',`${skySite.lat.toFixed(4)},${skySite.lon.toFixed(4)}`);return `${location.origin}${location.pathname}?${q}`;}
   $('link').onclick=()=>{const url=shareURL();history.replaceState(null,'',url);copyText(url,$('link'));};$('copytle').onclick=()=>copyText($('tle').textContent,$('copytle'));
   $('events').onclick=(e)=>{const row=e.target.closest('[data-met]');if(row){setPlaying(false);setMet(+row.dataset.met);}};
   $('legend').innerHTML=`<div>${M.flight_segments.map((k)=>`<span><i style="border-color:${data.tracks[k].color}"></i>${esc(data.tracks[k].label)}</span>`).join('')}${hasSolid?`<span><i style="border-color:${C.sun};border-top-width:3px"></i>Lit solid</span><span><i style="border-color:${C.s4}"></i>Lit S4</span>`:`<span><i style="border-color:${C.sun};border-top-width:3px"></i>Lit plume</span>`}</div><div><span><i class="d" style="border-color:${C.footprint}"></i>${A.MIN_ELEVATION_DEG}° circle</span>${hasJelly?`<span><i style="border-color:#fff"></i>${A.MIN_ELEVATION_DEG}° zone</span>`:''}<span><i style="border-color:${C.sun}"></i>Sun 0°</span><span><i style="border-color:${C.accent}"></i>Sun −12°</span></div>`;
@@ -294,7 +316,8 @@ async function start() {
     const next=timeline().find((e)=>e.met>state.met);document.querySelectorAll('#events [data-met]').forEach((b)=>{b.closest('tr').classList.toggle('past',+b.dataset.met<=state.met);b.closest('tr').classList.toggle('next',next?.met===+b.dataset.met);});
   }
   function trackAt(x,y){const r=view.getBoundingClientRect();let nearest=null,best=13;
-    for(const tr of flight)for(let i=0;i<tr.n;i+=3){const p=new THREE.Vector3(...tr.pt(i,1));if(!visible(p))continue;const q=p.project(camera),d=Math.hypot((q.x+1)*r.width/2+r.left-x,(1-q.y)*r.height/2+r.top-y);if(d<best){best=d;nearest={met:tr.metAt(i),alt:tr.alt[i]};}}
+    // Passes that coincide on screen (the inertial view's repeated revolutions) are told apart by preferring the sample nearest in time.
+    for(const tr of flight){const win=WIN&&tr===WIN.tr,i0=win?WIN.i0:0,i1=win?WIN.i0+Math.ceil(WIN.span/tr.dt):tr.n-1;for(let i=i0;i<=Math.min(tr.n-1,i1);i+=win?1:3){const p=new THREE.Vector3(...rotY(tr.pt(i,1),dRot(tr.metAt(i))-dRot(state.met)));if(!visible(p))continue;const q=p.project(camera),d=Math.hypot((q.x+1)*r.width/2+r.left-x,(1-q.y)*r.height/2+r.top-y),met=tr.metAt(i);if(d<best-6||(d<best+6&&d<13&&nearest&&Math.abs(met-state.met)<Math.abs(nearest.met-state.met))){best=Math.min(best,d);nearest={met,alt:tr.alt[i]};}}}
     return nearest;}
   // A clean click or tap seeks on the trajectory, or opens the sky chart for the ground under the pointer.
   function pick(x,y){const track=trackAt(x,y);if(track){setPlaying(false);setMet(track.met);return;}const ll=cam.groundAt(x,y);if(ll)openSky({lat:+ll.lat.toFixed(4),lon:+ll.lon.toFixed(4),custom:true},false,{x,y});}
@@ -304,7 +327,7 @@ async function start() {
   function declutterLabels(){
     const boxes=['ctl','info','legend'].map((id)=>$(id)).filter((el)=>el.getClientRects().length).map((el)=>el.getBoundingClientRect());
     const overlap=(a,b)=>a.left<b.right+4 && a.right+4>b.left && a.top<b.bottom+3 && a.bottom+3>b.top;
-    const objects=[shipLabel,...(mateLabel?[mateLabel]:[]),pickupLabel,...eventGroup.children,...zoneLabels.children,...cityGroup.children];
+    const objects=[shipLabel,...(mateLabel?[mateLabel]:[]),pickupLabel,...(padLabel?[padLabel]:[]),...eventGroup.children,...zoneLabels.children,...cityGroup.children];
     for(const o of objects){if(!o.isCSS2DObject || o.element.style.display==='none')continue;const r=o.element.getBoundingClientRect();const show=r.left>=16 && r.right<=innerWidth-16 && r.top>=50 && r.bottom<=innerHeight-24 && !boxes.some((b)=>overlap(r,b));o.element.style.visibility=show?'visible':'hidden';if(show)boxes.push(r);}
   }
   // Sun and Moon markers, as in cislunar-eye: beside the body when it is in view, otherwise a chevron on the screen edge pointing at it.
@@ -328,7 +351,7 @@ async function start() {
   function sceneChanged(now,tilesShown){
     const p=camera.position,q=camera.quaternion,u=earthMat.uniforms;
     let shown=0,bit=0;for(const on of Object.values(state.show))shown|=(on?1:0)<<bit++;
-    const next=[p.x,p.y,p.z,q.x,q.y,q.z,q.w,view.clientWidth,view.clientHeight,renderer.getPixelRatio(),state.met,state.t0,tilesShown,u.dayTex.value.id,u.nightTex.value.id,boundaryLayer.stats().segments,shown,zoneShown];
+    const next=[p.x,p.y,p.z,q.x,q.y,q.z,q.w,view.clientWidth,view.clientHeight,renderer.getPixelRatio(),state.met,state.t0,tilesShown,u.dayTex.value.id,u.nightTex.value.id,boundaryLayer.stats().segments,shown,zoneShown,state.frame==='gcrs'?1:0];
     if(gpuJudged&&now-lastDraw<1000&&now-lastInput>=1000&&next.every((v,k)=>Math.abs(v-drawnState[k])<=1e-7))return false;
     drawnState=next;lastDraw=now;draws++;return true;
   }
@@ -350,6 +373,8 @@ async function start() {
     else if(state.playing){state.met=Math.min(MET_END,state.met+dt*state.speed);if(state.met===MET_END)setPlaying(false);}
     const s=shipAt(state.met),nowUtc=t0ms()+state.met*1000,sv=sunVecAt(nowUtc);earthMat.uniforms.sunDir.value.set(...sv);
     if(state.follow&&!cam.fly)cam.approach(new THREE.Vector3(...s.u),1-Math.exp(-dt*2.5));
+    driftCamera();
+    pathRoot.rotation.y=-dRot(state.met);updateWindow(false);
     cam.update(now,dt);
     const tilesShown=mapTiles.update(now,view.clientWidth,view.clientHeight);sharpenBase();
     boundaryLayer.update(now,view.clientWidth,view.clientHeight,renderer.getPixelRatio(),state.show.borders);
@@ -358,8 +383,8 @@ async function start() {
     ship.position.set(...drawPoint(s));shipLabel.position.copy(ship.position);{const v=vehicleStateAt(state.met,stack,poweredAt),key=`${v.state}/${v.burning}`;if(key!==shipKey){shipKey=key;ship.material.map=vehicleTexture(v.state,v.burning);ship.material.needsUpdate=true;}}ship.material.color.setScalar(sty.lit?1:.45);glow.position.copy(ship.position);glow.visible=state.show.jelly&&sty.lit&&sty.powered;if(glint){glint.position.copy(ship.position);glint.visible=sty.lit&&!glow.visible&&state.met>0;}if(glow.visible){const solid=state.met<=solidEnd,k=clamp((s.alt-20)/200,0,1);glow.scale.setScalar(solid?.045+.115*k:.035);}
     const ahead=shipAt(Math.min(MET_END,state.met+2)),p0=ship.position.clone().project(camera),p1=new THREE.Vector3(...drawPoint(ahead)).project(camera);if(state.met>0&&state.met<MET_END)ship.material.rotation=Math.atan2((p1.y-p0.y)*view.clientHeight,(p1.x-p0.x)*view.clientWidth)-Math.PI/2;
     updateMate();updateFootprint(s);gtGroup.visible=state.show.gt;gridGroup.visible=state.show.grid;zoneGroup.visible=state.show.zones;zoneLabels.visible=state.show.zones;jellyGroup.visible=state.show.jelly;visLayer.visible=state.show.vis;fallGroup.visible=state.show.falls;cityGroup.visible=state.show.cities;
-    for(const g of [zoneLabels,eventGroup])for(const o of g.children)if(o.isCSS2DObject)o.visible=state.show.labels&&visible(o.position);
-    pickup.visible=!!J.pickup&&state.show.jelly;pickupLabel.visible=pickup.visible&&state.show.labels&&visible(pickup.position);shipLabel.visible=state.show.labels&&visible(ship.position);
+    for(const g of [zoneLabels,eventGroup])for(const o of g.children)if(o.isCSS2DObject)o.visible=state.show.labels&&visible(o.getWorldPosition(_wp));if(padLabel)padLabel.visible=state.show.labels&&visible(padLabel.position);
+    pickup.visible=!!J.pickup&&state.show.jelly;pickupLabel.visible=pickup.visible&&state.show.labels&&visible(pickup.getWorldPosition(_wp));shipLabel.visible=state.show.labels&&visible(ship.position);
     siteMark.visible=!!skySite&&sky.isOpen()&&visible(siteMark.position);
     const cityDistance=camera.position.length();
     for(const o of cityGroup.children)o.visible=visible(o.position)&&cityInRange(o.userData.tier,cityDistance)&&(!o.isCSS2DObject||state.show.labels);
@@ -377,5 +402,5 @@ async function start() {
   requestAnimationFrame((t)=>{frame(t);$('loading').remove();});
   const want=qs.get('sky'),city=CITIES.find((c)=>c[0].toLowerCase()===want?.toLowerCase()),ll=(want||'').split(',').map(Number);
   if(city)openSky({name:city[0],lon:city[1],lat:city[2]});else if(ll.length===2&&ll.every(Number.isFinite)&&Math.abs(ll[0])<=90&&Math.abs(ll[1])<=180)openSky({lat:ll[0],lon:ll[1],custom:true});
-  window.__globe={zones:()=>zones,viewers:()=>viewers,state,setMet,setT0,setPlaying,flyTo,camera,view:()=>cam.get(),setView:(view)=>cam.set(view),pick:(x,y)=>cam.groundAt(x,y),trackAt,observerMarker:siteMark,shareURL,sky,shipAt,jelly:()=>J,footprint:()=>fp,boundaryCoverage:boundaryData.coverage,earth:earthMat,mapLOD:mapTiles,boundaries:boundaryLayer,draws:()=>draws,meta:M,moon,skyBg,visLayer,renderer,groups:{trajGroup,gtGroup,jellyGroup,fallGroup,termGroup,cityGroup,gridGroup,zoneGroup},profile:profile.id,mission:entry.id};
+  window.__globe={zones:()=>zones,viewers:()=>viewers,state,setMet,setT0,setPlaying,flyTo,camera,view:()=>cam.get(),setView:(view)=>cam.set(view),pick:(x,y)=>cam.groundAt(x,y),trackAt,observerMarker:siteMark,shareURL,sky,shipAt,jelly:()=>J,footprint:()=>fp,boundaryCoverage:boundaryData.coverage,earth:earthMat,mapLOD:mapTiles,boundaries:boundaryLayer,draws:()=>draws,meta:M,moon,skyBg,visLayer,renderer,groups:{trajGroup,gtGroup,jellyGroup,fallGroup,termGroup,cityGroup,gridGroup,zoneGroup,pathRoot},frame:()=>state.frame,setFrame,window:()=>WIN&&{key:WIN.key,i0:WIN.i0,span:WIN.span,n:WIN.tr.n},OMEGA,profile:profile.id,mission:entry.id};
 }

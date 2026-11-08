@@ -1,0 +1,31 @@
+Startup and interaction, real GPU, 1728x1117 at 2x
+  renderer: ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)
+  PASS  map the page waits for  0.60 MB (budget 0.8); first frame 0.3 s; map total so far 3.47 MB
+  PASS  no long freeze after the first frame  worst 83 ms (budget 250)
+  PASS  scene size  395k triangles (budget 800k), 114 draw calls (budget 400)
+  PASS  borders past the horizon are not drawn  0k border triangles over the open Pacific (budget 60k)
+  PASS  idle page does not redraw  1.0 draws/s (budget 2)
+  PASS  idle main thread  3.9 % (budget 10)
+  PASS  smooth while playing  60 fps, p95 16.8 ms
+  PASS  smooth while dragging  60 fps, p95 16.7 ms, worst 17 ms
+  PASS  drag does not waste tile downloads  27 tiles in 10 s (budget 60)
+  PASS  tiles complete after a sweep  26/26
+  PASS  smooth while zooming  60 fps, worst 67 ms, 0 tiles
+  PASS  no errors or failed requests  none
+Stale frames: right after an action against the next guaranteed redraw
+  PASS  no stale frame in 29 actions  worst 0.000 % of pixels (sky chart; budget 0.05)
+  PASS  no errors during actions  none
+Leaks: 12 jumps across the globe
+  PASS  textures stay bounded  37 to 37 textures, 32 of 32 tile slots
+  PASS  geometry stays bounded  87 to 87
+  PASS  JS heap stays bounded  10.1 to 10.2 MB
+Failures: blocked assets and a lost WebGL context
+  PASS  page survives missing 8K maps, tiles and fine borders  base maps [4096, 4096]; exceptions none
+  PASS  page recovers from a lost WebGL context  map brightness 59; errors none
+Device rules
+  PASS  slow GPU: resolution steps down  pixel ratio 1.5 after 9 s, software GL
+  PASS  slow GPU: no 8K maps  none
+  PASS  phone size: no MSAA, no 8K  antialias False; 8K none
+Screenshots saved in /Users/mickey/launch/Starship-FLT15/.shots
+
+22 of 22 checks passed.

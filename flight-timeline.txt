@@ -1,0 +1,26 @@
+00:00:00	Liftoff
+00:00:58	Max Q (moment of peak aerodynamic stress on the rocket)
+00:02:19	Super Heavy MECO (most engines cut off)
+00:02:21	Hot-staging (Starship Raptor ignition and stage separation)
+00:02:26	Super Heavy boostback burn start
+00:03:02	Super Heavy boostback burn shutdown
+00:06:10	Super Heavy landing burn start
+00:06:35	Super Heavy landing burn shutdown and catch
+00:08:09	Starship engine cutoff
+00:26:10	Starship orbital insertion burn start
+00:26:30	Starship orbital insertion burn shutdown
+00:35:01	Payload deploy start
+01:17:40	Payload deploy complete
+01:27:46	Early Hawaii Return Check
+07:15:35	Mid Chile Return Check
+20:41:55	Final Hawaii Return Check
+21:35:57	Deorbit burn start
+21:36:07	Deorbit burn shutdown
+22:10:46	Starship entry
+22:29:34	Starship is transonic
+22:30:13	Starship is subsonic
+22:32:16	Landing burn start
+22:32:18	Landing flip
+22:32:26	Landing burn 3 to 2 engines
+22:32:33	Landing burn 2 to 1 engine
+22:32:34	Starship landing burn shutdown and catch

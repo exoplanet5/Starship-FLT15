@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "default_profile": "starship-275",
+  "supported_families": [
+    "retrograde",
+    "polar",
+    "sso",
+    "low-inclination"
+  ],
+  "profiles": [
+    {
+      "id": "starship-275",
+      "label": "Starship · 275 km · 30.6°",
+      "family": "low-inclination",
+      "default_mission": "flt15-rtls",
+      "missions": [
+        {
+          "id": "flt15-rtls",
+          "label": "Flight 15 · ship catch at Starbase",
+          "file": "data/flt15-rtls.json"
+        },
+        {
+          "id": "flt15-indian",
+          "label": "Contingency · no insertion, Indian Ocean",
+          "file": "data/flt15-indian.json"
+        },
+        {
+          "id": "flt15-hawaii-early",
+          "label": "Contingency · early return, N Pacific (orbit 2)",
+          "file": "data/flt15-hawaii-early.json"
+        },
+        {
+          "id": "flt15-chile",
+          "label": "Contingency · mid-mission, W of Chile (orbit 7)",
+          "file": "data/flt15-chile.json"
+        },
+        {
+          "id": "flt15-hawaii-late",
+          "label": "Contingency · late return, SW of Hawaii (orbit 14)",
+          "file": "data/flt15-hawaii-late.json"
+        }
+      ]
+    }
+  ]
+}

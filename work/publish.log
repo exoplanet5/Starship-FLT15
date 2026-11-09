@@ -28,3 +28,16 @@ GitHub Pages enabled on main, /docs
 Waiting for Pages build 42430407659; these have taken from one to ten minutes
 Published at https://exoplanet5.github.io/Starship-FLT15/
 Check it: ~/.venvs/astro313/bin/python /Users/mickey/.claude/skills/launch-page/scripts/check_page.py --url https://exoplanet5.github.io/Starship-FLT15/
+31 files in 4 commits to exoplanet5/Starship-FLT15
+  Flight 15 warnings: published areas and windows, late Hawaii on orbit 16, approach over the Laguna Madre: 28 files, 4.19 MB
+  Add flt15_catch_approach.png: 1 files, 8.68 MB
+  Add flt15_mission_map.png: 1 files, 11.35 MB
+  Add flt15_mission_map_pacific.png: 1 files, 11.31 MB
+  pushed Flight 15 warnings: published areas and windows, late Hawaii on orbit 16, approach over the Laguna Madre in 5 s
+  pushed Add flt15_catch_approach.png in 29 s
+  pushed Add flt15_mission_map.png in 15 s
+  pushed Add flt15_mission_map_pacific.png in 14 s
+Remote main is at 31a93d5
+Waiting for Pages build 42647764729; these have taken from one to ten minutes
+Published at https://exoplanet5.github.io/Starship-FLT15/
+Check it: ~/.venvs/astro313/bin/python /Users/mickey/.claude/skills/launch-page/scripts/check_page.py --url https://exoplanet5.github.io/Starship-FLT15/

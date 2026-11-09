@@ -6,7 +6,7 @@ import {LineSegments2} from 'three/addons/lines/LineSegments2.js';
 import {LineSegmentsGeometry} from 'three/addons/lines/LineSegmentsGeometry.js';
 import {CSS2DRenderer, CSS2DObject} from 'three/addons/renderers/CSS2DRenderer.js';
 import * as A from './astro.js';
-import {fetchJSON, validateManifest, validateMission, selectProfile, createFlight, solarEphemeris, sunlightClearance, computeJelly, clockSeconds, clamp, escapeHTML as esc} from './profile.js';
+import {fetchJSON, validateManifest, validateMission, selectProfile, createFlight, solarEphemeris, sunlightClearance, computeJelly, clockSeconds, clamp, escapeHTML as esc, LAYERS} from './profile.js';
 import {createSkyChart} from './skychart.js';
 import {validateBoundaries,boundarySegments} from './boundaries.js';
 import {createMapTiles} from './map-tiles.js';
@@ -43,7 +43,7 @@ async function start() {
   const state = {date:M.date,t0:Number.isFinite(requestedT0)?clamp(requestedT0,t0Min,t0Max):clockSeconds(M.t0_default),
     met:num('met',M.met_default??300,metMin,MET_END),follow:qs.get('follow')==='1',playing:false,live:false,speed:num('speed',10,1,300),
     frame:qs.get('frame')==='gcrs'?'gcrs':'ecef',
-    show:Object.fromEntries(['term','zones','labels','gt','jelly','vis','falls','sky','grid','lights','cities','fp','borders'].map((k)=>[k,qs.get(k)!=='0']))};
+    show:Object.fromEntries(LAYERS.map((k)=>[k,qs.has(k)?qs.get(k)!=='0':(M.layer_defaults?.[k]??true)]))};   // URL state, else the mission's layer_defaults, else on
   // Reference frame of the drawn paths. ECEF: the Earth-fixed scene as it is. GCRS: paths are rotated to the inertial frame (the ECEF frame at
   // liftoff turned by the sidereal rate), the path group turns back by -OMEGA*MET so the vehicle stays over its sub-point, and the camera's
   // anchor longitude drifts westward at the sidereal rate, so the viewer is fixed in inertial space and the Earth turns under a fixed orbit.
@@ -270,6 +270,7 @@ async function start() {
   $('views').onclick=(e)=>{const v=M.views[+e.target.dataset.view];if(v)flyTo(v[1],v[2],v[3]);};
   for(const k of Object.keys(state.show)){$('o-'+k).checked=state.show[k];$('o-'+k).onchange=()=>{state.show[k]=$('o-'+k).checked;dirty();};}
   for(const [k,text] of Object.entries(M.layer_labels??{})){const box=$('o-'+k);if(box)box.parentElement.lastChild.textContent=text;}
+  for(const k of M.layer_order??[]){const row=$('o-'+k)?.parentElement;if(row)row.parentElement.appendChild(row);}   // these checkboxes go to the end of the panel, in this order
   $('o-follow').checked=state.follow;$('o-follow').onchange=()=>setFollow($('o-follow').checked);
   async function copyText(text,button){const old=button.textContent;let copied=false;try{await navigator.clipboard.writeText(text);copied=true;}catch{const box=document.createElement('textarea');box.value=text;document.body.appendChild(box);box.select();copied=document.execCommand('copy');box.remove();}button.textContent=copied?'Copied':'Copy unavailable';if(!copied)message('Clipboard unavailable. Select the TLE text or copy the browser address.');setTimeout(()=>{button.textContent=old;},1600);}
   function shareURL(){const q=new URLSearchParams({profile:profile.id,mission:entry.id,t0:A.fmtHMS(t0ms()),met:state.met.toFixed(3),cam:camParam(),frame:state.frame,follow:state.follow?'1':'0',speed:state.speed});for(const [k,v]of Object.entries(state.show))q.set(k,v?'1':'0');if(sky.isOpen()&&skySite)q.set('sky',`${skySite.lat.toFixed(4)},${skySite.lon.toFixed(4)}`);return `${location.origin}${location.pathname}?${q}`;}

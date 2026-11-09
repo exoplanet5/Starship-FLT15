@@ -134,7 +134,7 @@ def mission(mid, mission_label, menu_label, desc_key, tracks, segments, events, 
                 met_default=met_default, insertion_met=float(T['ins0']), period_s=float(orbit.T_nodal*60), orbit_revolutions=(orbit_end - T['ins0'])/(orbit.T_nodal*60),
                 orbit_end_met=float(orbit_end), inc=round(float(orbit.inc), 4), perigee_km=O.H_ORBIT, apogee_km=O.H_ORBIT, az=100.0,
                 s4_cutoff_met=float(T['seco']), cutoff_label='SECO', stack=STACK, companion=COMPANION, extra_cities=CITIES, observer_home='South Padre Island',
-                local_time=dict(label='CST', offset_h=-6), model_badge='Pre-launch model', readme_url='https://github.com/exoplanet5/Starship-FLT15#limitations', track_window=dict(track='orbit', revolutions=2), zone_noun='hazard area', layer_labels=dict(falls='Booster · other descents', zones='Hazard areas'),
+                local_time=dict(label='CST', offset_h=-6), model_badge='Pre-launch model', readme_url='https://github.com/exoplanet5/Starship-FLT15#limitations', track_window=dict(track='orbit', revolutions=2), zone_noun='hazard area', layer_labels=dict(falls='Booster · other descents', zones='Hazard areas'), layer_defaults=dict(jelly=False, cities=False), layer_order=['jelly', 'cities'],
                 flight_segments=segments, powered_intervals=powered, phases=phases, views=VIEWS,
                 visibility=dict(extent=[-125, -75, 10, 40], grid_step_deg=0.5, time_step_s=5, levels=[10]), about=about, notes=notes)
     if globals().get('_NO_WINDOW'): meta.pop('track_window', None)

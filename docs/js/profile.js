@@ -107,6 +107,8 @@ export function validateMission(data) {
   if (m.track_window !== undefined) require(!!m.track_window && typeof m.track_window.track === 'string' && m.flight_segments.includes(m.track_window.track) && (m.track_window.revolutions === undefined || (finite(m.track_window.revolutions) && m.track_window.revolutions > 0)), 'Invalid meta.track_window: it needs a flight segment and a positive number of revolutions');
   if (m.zone_noun !== undefined) require(typeof m.zone_noun === 'string' && m.zone_noun.length <= 24, 'Invalid meta.zone_noun');
   if (m.layer_labels !== undefined) require(!!m.layer_labels && typeof m.layer_labels === 'object' && Object.values(m.layer_labels).every((t) => typeof t === 'string' && t.length <= 32), 'Invalid meta.layer_labels');
+  if (m.layer_defaults !== undefined) require(!!m.layer_defaults && typeof m.layer_defaults === 'object' && Object.entries(m.layer_defaults).every(([k, v]) => LAYERS.includes(k) && typeof v === 'boolean'), 'Invalid meta.layer_defaults: layer names with true or false');
+  if (m.layer_order !== undefined) require(Array.isArray(m.layer_order) && m.layer_order.every((k) => LAYERS.includes(k)), 'Invalid meta.layer_order: a list of layer names');
   if (m.extra_cities) require(Array.isArray(m.extra_cities) && m.extra_cities.every((c) => c.length === 4 && typeof c[0] === 'string' && finite(c[1]) && finite(c[2]) && finite(c[3])), 'Invalid meta.extra_cities');
   if (m.model_badge !== undefined) require(typeof m.model_badge === 'string' && m.model_badge.length <= 40, 'Invalid meta.model_badge');
   if (m.cutoff_label !== undefined) require(typeof m.cutoff_label === 'string' && m.cutoff_label.length <= 24, 'Invalid meta.cutoff_label');
@@ -185,3 +187,6 @@ export function computeJelly(asc, sunAt, T0) {
   if (lit[0]) pickup = {met:asc.met0,...asc.sample(asc.met0),fromLiftoff:true};
   return {T0,lit,dep,h,pickup,transitions};
 }
+
+// The layer checkboxes, in the panel's order: the keys of meta.layer_defaults, meta.layer_order and the ?layer=0 URL state.
+export const LAYERS = ['term', 'zones', 'labels', 'gt', 'jelly', 'vis', 'falls', 'sky', 'grid', 'lights', 'cities', 'fp', 'borders'];

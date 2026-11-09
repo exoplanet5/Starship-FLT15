@@ -1,58 +1,99 @@
-"""Hazard zones for the Flight 15 page and maps: the Flight 14 polygons (../navwarning, read through ift14_fit) with their daily
-windows re-timed from the Flight 14 launch window (12:15-13:30Z) to the Flight 15 window (22:45-00:00Z). SpaceX says the Flight 15
-contingency areas are the precleared areas used on Flight 14; no Flight 15 warnings were published when this was written, so the
-windows below are model values, not published ones, and the page labels them so."""
-import sys, numpy as np
-sys.path.insert(0, '/Users/mickey/sda/starship-ITF-14/work'); sys.path.insert(0, '/Users/mickey/launch/Starship-FLT15/work')
-import ift14_fit as F
-import flt15_orbit as O
+"""Hazard areas for the Flight 15 page and maps: the Flight 15 navigational warnings in ../navwarning (NGA text as issued
+7-9 Nov 2026) parsed into polygons, with their published daily windows (HHMM UTC).
 
-T0_OPEN14, T0_CLOSE14 = 12*3600 + 15*60, 13*3600 + 30*60
-T0_OPEN15, T0_CLOSE15 = 22*3600 + 45*60, 24*3600            # 22:45Z to 00:00Z (next day)
-def _hm(s): return int(s[:2])*3600 + int(s[2:])*60
-def retime(t0, t1, late=False):
-    """Flight 14 window HHMM-HHMM -> Flight 15 HHMM-HHMM keeping the offsets from the window open and close.
-    late=True keeps the same offsets but one orbit-count later is not needed: the orbit-15 pass uses the nominal deorbit timing."""
-    a, b = _hm(t0), _hm(t1)
-    if b < a: b += 86400
-    a15 = (a - T0_OPEN14 + T0_OPEN15) % 86400; b15 = (b - T0_CLOSE14 + T0_CLOSE15) % 86400
-    return f'{a15//3600:02d}{a15%3600//60:02d}', f'{b15//3600:02d}{b15%3600//60:02d}'
+  NAVAREA IV 1080/26 A, B   launch, Gulf of America and Yucatan Channel; booster return      2245-0040Z 13 Nov, daily 14-19 Nov
+  NAVAREA IV 1081/26        ship catch: Laguna Madre, Padre Island and the Gulf off Starbase  2108-0014Z 14-15 Nov, daily 15-20 Nov
+  HYDROPAC 3244/26          eastern Indian Ocean, no-insertion contingency                    2253-0114Z daily 13-19 Nov
+  HYDROPAC 3257/26          North Pacific, Midway Islands: early Hawaii, orbits 2-3           0130-0501Z daily 14-20 Nov (the Flight 14 polygon)
+  HYDROPAC 3254/26          South Pacific west of Chile: mid-mission, orbits 7-8              0812-1137Z daily 14-20 Nov
+  HYDROPAC 3256/26          North Pacific, Micronesia to north-east of Hawaii: late Hawaii,   2217-0144Z daily 14-20 Nov
+                            the pass after the Starbase pass (orbit 16) and the next one
+The dates are the UTC days of each window's opening; the launch window is 13 Nov 22:45-00:00Z, so the 14-20 Nov windows
+belong to launches on 13-19 Nov. Each contingency window opens as the modeled descent enters the area and closes about
+one orbit plus 20 minutes after the first-pass splashdown, i.e. each covers two consecutive passes."""
+import re, numpy as np
+from pathlib import Path
+from shapely.geometry import Polygon, LineString, Point
 
+ROOT = Path('/Users/mickey/launch/Starship-FLT15'); NAV = ROOT/'navwarning'
+T0_OPEN15, T0_CLOSE15 = 22*3600 + 45*60, 24*3600            # launch window 22:45Z to 00:00Z (next day)
+
+def _dm(tok):
+    """'24-58.00S' -> -24.9667, '070-56.00E' -> 70.9333"""
+    d, mi, h = re.fullmatch(r'(\d{2,3})-(\d{2}(?:\.\d+)?)([NSEW])', tok).groups()
+    v = int(d) + float(mi)/60; return -v if h in 'SW' else v
+_PAIR = re.compile(r'(\d{2}-\d{2}\.\d{2}[NS])\s+(\d{3}-\d{2}\.\d{2}[EW])')
+
+def read_warning(path):
+    """one NGA text warning -> list of areas: dict(name, poly, pts, wrap, t0, t1, dates, issued, cancel)"""
+    txt = Path(path).read_text(); lines = txt.splitlines()
+    issued = lines[0].strip(); name = lines[1].strip().rstrip('.')
+    m = re.search(r'(\d{2})(\d{4})Z TO (\d{2})(\d{4})Z NOV', txt)                      # dated form: 132245Z TO 140040Z NOV
+    md = re.search(r'(\d{4})Z TO (\d{4})Z DAILY (\d+) THRU? (\d+) NOV', txt)           # daily form ('THR' in 3256/26)
+    if m: t0, t1, dates = m.group(2), m.group(4), f'{int(m.group(1))} Nov'
+    else: t0, t1, dates = md.group(1), md.group(2), ''
+    if md: dates += (', ' if dates else '') + f'daily {int(md.group(3))}-{int(md.group(4))} Nov'
+    cancel = re.search(r'CANCEL THIS MSG (\d{6})Z', txt).group(1)
+    body = txt.split('BOUND BY', 1)[1]
+    parts = re.split(r'\n\s+([A-Z])\.\s+', '\n' + body) if 'AREAS BOUND BY' in txt else [None, None, body]
+    out = []
+    for sub, chunk in zip(parts[1::2], parts[2::2]):
+        pts = [(_dm(lo), _dm(la)) for la, lo in _PAIR.findall(chunk)]
+        lons = np.array([p[0] for p in pts]); wrap = lons.max() - lons.min() > 180
+        if wrap: pts = [(x % 360, y) for x, y in pts]                                   # keep the ring continuous in 0..360
+        if pts[0] != pts[-1]: pts.append(pts[0])
+        out.append(dict(name=name + (f' {sub}' if sub else ''), sub=sub, poly=Polygon(pts), pts=pts, wrap=wrap, t0=t0, t1=t1, dates=dates,
+                        issued=issued, cancel=cancel, file=Path(path).name))
+    return out
+
+AREAS = {a['name']: a for f in sorted(NAV.iterdir()) if f.is_file() and not f.suffix and f.name != 'README.md' for a in read_warning(f)}
+KEYS = {'launchA': 'NAVAREA IV 1080/26 A', 'launchB': 'NAVAREA IV 1080/26 B', 'indian': 'HYDROPAC 3244/26', 'npac1': 'HYDROPAC 3257/26',
+        'chile': 'HYDROPAC 3254/26', 'late': 'HYDROPAC 3256/26', 'catch': 'NAVAREA IV 1081/26'}
+ZD = {k: AREAS[v] for k, v in KEYS.items()}                  # ift14_fit-compatible zone dicts (poly, pts, wrap): F.zcontains, F.crossings work on them
+
+def contains(z, lon, lat):
+    p = Point(lon, lat); return bool(z['poly'].contains(p) or (z['wrap'] and z['poly'].contains(Point(lon % 360, lat))))
+def crossings(z, met, lon, lat):
+    """[(met_in, met_out), ...] intervals of a sampled track inside the area"""
+    inside = np.array([contains(z, x, y) for x, y in zip(lon, lat)]); idx = np.where(inside)[0]
+    return [] if len(idx) == 0 else [(float(met[g[0]]), float(met[g[-1]])) for g in np.split(idx, np.where(np.diff(idx) > 1)[0] + 1)]
+def centerline(z, step=0.5):
+    """(lon, lat) mid-points of north-south cuts through the area, west to east"""
+    x0, _, x1, _ = z['poly'].bounds; pts = []
+    for lon in np.arange(x0 + step, x1, step):
+        cut = z['poly'].intersection(LineString([(lon, -89), (lon, 89)]))
+        if not cut.is_empty: pts.append((((lon + 180) % 360) - 180, 0.5*(cut.bounds[1] + cut.bounds[3])))
+    return np.array(pts)
 def hhmm(sec): return f'{sec//3600:02d}{sec%3600//60:02d}'
+def window_met(z):
+    """the published window as MET offsets (s) for the earliest and the latest launch: (open, close) for T0 22:45Z, (open, close) for T0 00:00Z;
+    the window's first date gives its day relative to the 13 Nov launch date"""
+    a = int(z['t0'][:2])*3600 + int(z['t0'][2:])*60; b = int(z['t1'][:2])*3600 + int(z['t1'][2:])*60
+    if b < a: b += 86400
+    day = int(re.search(r'(\d+)', z['dates']).group(1)) - 13; a += day*86400; b += day*86400
+    return (a - T0_OPEN15, b - T0_OPEN15), (a - T0_CLOSE15, b - T0_CLOSE15)
 
+SUN, DANGER, WARN, OK, VIOLET, CYAN = '#ffd54f', '#ff5252', '#ffb84f', '#7ad97a', '#c792ea', '#4fc3f7'
 ZONES = []
-def add(key, fkey, role, label, color, ident, desc, window):
-    z = F.Z[fkey]; pts = [(float(x), float(y)) for x, y in z['pts']]
+def add(key, role, label, color, desc):
+    z = ZD[key]; pts = [(float(x), float(y)) for x, y in z['pts']]
     if z['wrap']: pts = [(((x + 180) % 360) - 180, y) for x, y in pts]          # back to -180..180; the page re-wraps edge by edge
-    if pts[0] != pts[-1]: pts.append(pts[0])
     lon = np.array([p[0] for p in pts]); lat = np.array([p[1] for p in pts])
     ul = np.where(lon < 0, lon + 360, lon) if z['wrap'] else lon
-    cen = [float(((ul.mean() + 180) % 360) - 180), float(lat.mean())]
-    ZONES.append(dict(key=key, id=ident, role=role, label=label, color=color, t0=window[0], t1=window[1], ring=[[round(x, 4), round(y, 4)] for x, y in pts],
-                      centroid=[round(cen[0], 3), round(cen[1], 3)], desc=desc, fkey=fkey, published=False))
-SUN, DANGER, WARN, OK, VIOLET = '#ffd54f', '#ff5252', '#ffb84f', '#7ad97a', '#c792ea'
-add('launchA', 'launchA', 'launch', 'Launch · Gulf', SUN, 'NAVAREA IV 922/26 A (Flight 14)', 'Launch hazard area A, Gulf of America and Yucatán Channel; Flight 14 polygon', retime('1215', '1414'))
-add('launchB', 'launchB', 'launch', 'Launch · area B', SUN, 'NAVAREA IV 922/26 B (Flight 14)', 'Launch hazard area B; Flight 14 polygon', retime('1215', '1414'))
-add('indian', 'indian', 'contingency', 'Indian Ocean · no insertion', DANGER, 'HYDROPAC 2751/26 (Flight 14)', 'Suborbital contingency: no insertion burn, splashdown from the SECO coast; Flight 14 polygon', retime('1223', '1447'))
-add('npac1', 'npac', 'contingency', 'N Pacific · early Hawaii', WARN, 'NAVAREA XII 657/26 (Flight 14)', 'Early-mission contingency: deorbit on orbit 2, splashdown north of Hawaii; Flight 14 polygon', retime('1427', '1833'))
-add('chile', 'chile', 'contingency', 'S Pacific · W of Chile', OK, 'HYDROPAC 2750/26 (Flight 14)', 'Mid-mission contingency: deorbit on orbit 7, landing several hundred km west of Chile; Flight 14 polygon', retime('2107', '0108'))
-import json as _json
-_DESC = O.ROOT/'work'/'descents.json'
-def _late_box():
-    """model splashdown area for the late-Hawaii option: a box around the solved splash point, longer uprange (south-west);
-    not a published warning"""
-    c = _json.load(open(_DESC)) if _DESC.exists() else {}
-    tr = c.get('tracks', {}).get('hawaii2'); sol = c.get('solutions', {}).get('hawaii2')
-    if not tr: return None
-    lon, lat = tr['splash']; pts = [(lon - 6.0, lat - 2.6), (lon + 3.0, lat - 0.9), (lon + 3.4, lat + 1.4), (lon - 5.6, lat + 1.2), (lon - 6.0, lat - 2.6)]
-    t_open = int(T0_OPEN15 + sol['t_burn']) % 86400; t_close = int(T0_CLOSE15 + tr['t_splash'] + 60*60) % 86400
-    return pts, (hhmm(t_open), hhmm(t_close))
-_lb = _late_box()
-if _lb:
-    pts, win = _lb; lon = np.array([p[0] for p in pts]); lat = np.array([p[1] for p in pts])
-    ZONES.append(dict(key='late', id='Model area (not a warning)', role='contingency', label='SW of Hawaii · late (model)', color=VIOLET, t0=win[0], t1=win[1],
-                      ring=[[round(x, 4), round(y, 4)] for x, y in pts], centroid=[round(float(lon[:-1].mean()), 3), round(float(lat[:-1].mean()), 3)],
-                      desc='Late-mission contingency on the 14th orbit: deorbit 15-30 min before the nominal burn on the same Pacific pass, splashdown south-west of Hawaii short of the islands; a model area, no warning has been published', fkey=None, published=False))
+    cen = [float(((ul[:-1].mean() + 180) % 360) - 180), float(lat[:-1].mean())]
+    ZONES.append(dict(key=key, id=z['name'], role=role, label=label, color=color, t0=z['t0'], t1=z['t1'], dates=z['dates'], issued=z['issued'],
+                      ring=[[round(x, 4), round(y, 4)] for x, y in pts], centroid=[round(cen[0], 3), round(cen[1], 3)], desc=desc, published=True))
+add('launchA', 'launch', 'Launch · Gulf', SUN, 'Launch hazard area A, Gulf of America, Yucatán Channel and the Caribbean south of Cuba (NAVAREA IV 1080/26, 9 Nov 2026)')
+add('launchB', 'launch', 'Launch · area B', SUN, 'Launch hazard area B off Starbase, the Super Heavy return (NAVAREA IV 1080/26, 9 Nov 2026)')
+add('indian', 'contingency', 'Indian Ocean · no insertion', DANGER, 'Suborbital contingency: no insertion burn, splashdown from the SECO coast (HYDROPAC 3244/26, 7 Nov 2026)')
+add('npac1', 'contingency', 'N Pacific · early Hawaii', WARN, 'Early-mission contingency: deorbit on orbit 2 (the window also covers orbit 3), splashdown north of Hawaii; the Flight 14 polygon (HYDROPAC 3257/26, 9 Nov 2026)')
+add('chile', 'contingency', 'S Pacific · W of Chile', OK, 'Mid-mission contingency: deorbit on orbit 7 (the window also covers orbit 8), landing several hundred km west of Chile (HYDROPAC 3254/26, 9 Nov 2026)')
+add('late', 'contingency', 'N Pacific · late Hawaii', VIOLET, 'Late-mission contingency on orbit 16, the pass after the Starbase pass (the window also covers orbit 17): entry from Micronesia to a splashdown north-east of Hawaii (HYDROPAC 3256/26, 9 Nov 2026)')
+add('catch', 'landing', 'Ship catch · Starbase', CYAN, 'Ship return: Laguna Madre, Padre Island and the Gulf off Starbase for the final approach and catch; the land corridor is under FAA notices (NAVAREA IV 1081/26, 9 Nov 2026)')
 
 if __name__ == '__main__':
-    for z in ZONES: print(f"{z['key']:8s} {z['label']:28s} {z['t0']}-{z['t1']}Z  centroid {z['centroid']}  {len(z['ring'])} pts  {z['id']}")
+    import sys
+    def fmt(s): s = int(round(s)); return f'T+{s//3600:02d}:{s%3600//60:02d}:{s%60:02d}'
+    for z in ZONES:
+        (a, b), (c, d) = window_met(ZD[z['key']])
+        print(f"{z['key']:8s} {z['id']:22s} {z['t0']}-{z['t1']}Z {z['dates']:24s} early launch {fmt(a)}..{fmt(b)}  late launch {fmt(c)}..{fmt(d)}  {len(z['ring'])} pts  centroid {z['centroid']}")

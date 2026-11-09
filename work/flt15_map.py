@@ -12,7 +12,7 @@ orbit, T, fmt = O.orbit, O.T, O.fmt
 C = D.build(); TR, SOL = C['tracks'], C['solutions']
 T0 = np.datetime64('2026-11-13T22:45:00')
 FS = 0.6                     # font scale: the style module was tuned for 22 in at 180 dpi; this exports 13.2 in at 300 dpi
-VIOLET, INK, ORANGE, STEEL = '#c792ea', '#e8eaed', '#ffa64d', '#b0c4de'
+VIOLET, INK, ORANGE, STEEL, CYAN = '#c792ea', '#e8eaed', '#ffa64d', '#b0c4de', '#4fc3f7'
 
 def new_fig(W, H, title):
     fig = plt.figure(figsize=(W, H), facecolor=BG)
@@ -35,8 +35,8 @@ def legend2(ax, items, loc='lower left', anchor=(0.0, 0.0)):
                    edgecolor='#2a323c', labelcolor=FG, handlelength=2.2, columnspacing=1.1, borderpad=0.6)
     lg.set_zorder(12); return lg
 
-def nominal_arrays():
-    mm = np.arange(0, T['deorb0']/60 + 1e-9, 1/6); lo, la = orbit.nominal(mm); return mm*60, lo, la
+def nominal_arrays(t_end=None):
+    mm = np.arange(0, (T['deorb0'] if t_end is None else t_end)/60 + 1e-9, 1/6); lo, la = orbit.nominal(mm); return mm*60, lo, la
 
 # ================= global mission map =================
 def unwrap(lon, center):
@@ -82,17 +82,18 @@ def global_map(center=None):
         for shift in shifts:
             q = np.c_[lon + shift, pts[:, 1]]
             ax.add_patch(MPoly(q, closed=True, facecolor=z['color'], alpha=0.20, edgecolor='none', zorder=4)); ax.add_patch(MPoly(q, closed=True, facecolor='none', edgecolor=z['color'], alpha=0.95, lw=1.0, zorder=4))
-    ZL = {'launchA': (-92, 30.2, 'left', 'bottom', f"Launch · Gulf  {Z.ZONES[0]['t0']}–{Z.ZONES[0]['t1']}Z"), 'indian': (60, -34.5, 'left', 'top', f"Indian Ocean · no insertion  {Z.ZONES[2]['t0']}–{Z.ZONES[2]['t1']}Z"),
-          'npac1': (178, 34.5, 'right', 'bottom', f"North Pacific · early Hawaii  {Z.ZONES[3]['t0']}–{Z.ZONES[3]['t1']}Z"),
-          'late': (-178, 9.5, 'left', 'top', f"SW of Hawaii · late, orbit 14  {Z.ZONES[5]['t0']}–{Z.ZONES[5]['t1']}Z (model area)"),
-          'chile': (-128, -18.0, 'left', 'bottom', f"S Pacific W of Chile · mid-mission  {Z.ZONES[4]['t0']}–{Z.ZONES[4]['t1']}Z")}
-    if center is not None: ZL['npac1'] = (-178, 34.5, 'center', 'bottom', ZL['npac1'][4]); ZL['indian'] = (72, -31.5, 'left', 'top', ZL['indian'][4])
+    ZN = {z['key']: z for z in Z.ZONES}; win = lambda k: f"{ZN[k]['t0']}–{ZN[k]['t1']}Z"
+    ZL = {'launchA': (-95.5, 22.8, 'left', 'top', f"Launch · Gulf  {win('launchA')}"), 'indian': (60, -34.5, 'left', 'top', f"Indian Ocean · no insertion  {win('indian')}"),
+          'npac1': (178, 34.5, 'right', 'bottom', f"North Pacific · early Hawaii, orbit 2  {win('npac1')}"),
+          'late': (118, 7.0, 'left', 'top', f"North Pacific · late Hawaii, orbit 16  {win('late')}"),
+          'chile': (-128, -18.0, 'left', 'bottom', f"S Pacific W of Chile · mid-mission, orbit 7  {win('chile')}")}
+    if center is not None: ZL['npac1'] = (-178, 34.5, 'center', 'bottom', ZL['npac1'][4]); ZL['indian'] = (72, -31.5, 'left', 'top', ZL['indian'][4]); ZL['late'] = (158, 5.0, 'left', 'top', ZL['late'][4])
     for k, (x, y, ha, va, txt) in ZL.items():
-        z = next(q for q in Z.ZONES if q['key'] == k); lab(ax, float(Wf(x)), y, txt, color=z['color'], ha=ha, va=va, linespacing=1.25)
-    t, lo, la = nominal_arrays(); lo = Wf(lo)
-    a = t < T['seco']; c = (t >= T['seco']) & (t <= T['ins0']); o = t >= T['ins0']
+        lab(ax, float(Wf(x)), y, txt, color=ZN[k]['color'], ha=ha, va=va, linespacing=1.25)
+    t, lo, la = nominal_arrays(TR['hawaii2']['t_burn']); lo = Wf(lo)
+    a = t < T['seco']; c = (t >= T['seco']) & (t <= T['ins0']); o = (t >= T['ins0']) & (t <= T['deorb0']); x = t >= T['deorb0']
     plot_track(ax, lo[a], la[a], color=ORANGE, lw=2.2, alpha=0.95, zorder=5); plot_track(ax, lo[c], la[c], color=ORANGE, lw=1.6, ls=(0, (3, 3)), alpha=0.95, zorder=5)
-    plot_track(ax, lo[o], la[o], color=STEEL, lw=0.8, alpha=0.7, zorder=5)
+    plot_track(ax, lo[o], la[o], color=STEEL, lw=0.8, alpha=0.7, zorder=5); plot_track(ax, lo[x], la[x], color=STEEL, lw=0.8, alpha=0.35, zorder=5)   # one more orbit, to the late-Hawaii burn
     for k, col, lw, ls in [('indian', DANGER, 1.5, (0, (3, 3))), ('hawaii1', WARN, 1.5, (0, (3, 3))), ('chile', OK, 1.5, (0, (3, 3))), ('hawaii2', VIOLET, 1.5, (0, (3, 3)))]:
         tr = TR[k]; plot_track(ax, Wf(tr['lon']), tr['lat'], color=col, lw=lw, ls=ls, alpha=0.95, zorder=6)
     nm = TR['nominal']; mm = np.array(nm['met']); hi = mm <= nm['t_ei']
@@ -102,7 +103,9 @@ def global_map(center=None):
     for k, j in enumerate(i, 1): ax.text(lo[j] - 1.5, la[j] + 1.2, f'{k}', color=STEEL, fontsize=8*FS*1.2, ha='center', va='bottom', path_effects=[HALO], zorder=9)
     SBx = float(Wf(F.STARBASE[0]))
     ax.plot(SBx, F.STARBASE[1], marker='^', ms=10*FS*1.2, mfc=DANGER, mec=(8/255, 10/255, 14/255, 0.9), mew=1, ls='none', zorder=7)
-    lab(ax, SBx + 1.0, F.STARBASE[1] + 2.0, 'Starbase · liftoff T+00:00:00 · booster catch T+00:06:35\nship catch T+22:32:34 on the orbit-15 pass', ha='left', va='bottom')
+    sb_txt = (f"Starbase · liftoff T+00:00:00 · booster catch T+00:06:35\nship catch T+22:32:34 on the orbit-15 pass · catch area {win('catch')} 14–15 Nov" if center is None else
+              f"Starbase · liftoff T+00:00:00\nbooster catch T+00:06:35 · ship catch T+22:32:34 (orbit-15 pass)\ncatch area {win('catch')} 14–15 Nov")      # the Pacific view's right edge is near
+    lab(ax, SBx + 1.0, F.STARBASE[1] + 2.0, sb_txt, ha='left', va='bottom')
     j = int(np.searchsorted(t, T['seco'])); sqm(ax, lo[j], la[j], ORANGE, f'SECO {fmt(T["seco"])}', dx=1.8, dy=-1.2, va='top', hollow=True)
     j = int(np.searchsorted(t, T['ins0'])); sqm(ax, lo[j], la[j], ORANGE, f'insertion burn {fmt(T["ins0"])}', dx=2.0, dy=-0.8, va='top')
     j = int(np.searchsorted(t, T['dep0'])); sqm(ax, lo[j], la[j], STEEL, f'Starlink V3 deploy\n{fmt(T["dep0"])}–{fmt(T["dep1"])[2:]}', dx=-2.2, dy=-1.5, ha='right', va='top', hollow=True)
@@ -111,9 +114,9 @@ def global_map(center=None):
     sqm(ax, float(Wf(n['ei'][0])), n['ei'][1], INK, f'120 km {fmt(n["t_ei"])}', dx=-2.0, dy=1.4, ha='right', va='bottom', hollow=True)
     jj = int(np.argmin(np.abs(np.array(n['met']) - T['entry']))); sqm(ax, float(Wf(n['lon'][jj])), n['lat'][jj], INK, f'entry {fmt(T["entry"])}', dx=-1.5, dy=2.0, ha='right', va='bottom', hollow=True)
     for k, col, txt, dx, dy, ha, va in [('indian', DANGER, f"no insertion → splash {fmt(TR['indian']['t_splash'])}", 2.5, -1.5, 'left', 'top'), ('hawaii1', WARN, f"orbit 2 → splash {fmt(TR['hawaii1']['t_splash'])}", 2.5, -2.2, 'left', 'top'),
-                                         ('chile', OK, f"orbit 7 → landing {fmt(TR['chile']['t_splash'])}", 2.5, 2.0, 'left', 'bottom'), ('hawaii2', VIOLET, f"orbit 14 → splash {fmt(TR['hawaii2']['t_splash'])}", 2.5, -2.2, 'left', 'top')]:
-        tr = TR[k]; sx = float(Wf(tr['splash'][0])); starm(ax, sx, tr['splash'][1], col, ms=14, hollow=True); lab(ax, sx + dx, tr['splash'][1] + dy, txt, ha=ha, va=va)
-        flip = center is not None and k in ('hawaii1', 'hawaii2')       # these burns sit near the Pacific view's right edge
+                                         ('chile', OK, f"orbit 7 → landing {fmt(TR['chile']['t_splash'])}", 2.5, 2.0, 'left', 'bottom'), ('hawaii2', VIOLET, f"orbit 16 → splash {fmt(TR['hawaii2']['t_splash'])}", 2.5, 2.0, 'left', 'bottom')]:
+        tr = TR[k]; sx = float(Wf(tr['splash'][0])); starm(ax, sx, tr['splash'][1], col, ms=14 if k != 'hawaii2' else 20, hollow=True); lab(ax, sx + dx, tr['splash'][1] + dy, txt, ha=ha, va=va)
+        flip = center is not None and float(Wf(tr['burn'][0])) > center + 150       # a burn near the Pacific view's right edge: label to the left
         below = k == 'hawaii1' and not flip                               # the orbit-2 burn label goes under its square, except in the Pacific view
         sqm(ax, float(Wf(tr['burn'][0])), tr['burn'][1], col, f"burn {fmt(tr['t_burn'])}" if tr['t_burn'] else None, dx=(-1.8 if flip else 1.8), ha=('right' if flip else 'left'), dy=(-1.5 if below else 1.2), va=('top' if below else 'bottom'))
     starm(ax, SBx, F.STARBASE[1], INK, ms=18)
@@ -125,10 +128,10 @@ def global_map(center=None):
              (f'Indian Ocean   no insertion burn        splash {fmt(TR["indian"]["t_splash"])}', DANGER, False),
              (f'N Pacific      deorbit {fmt(TR["hawaii1"]["t_burn"])} (orbit 2)  splash {fmt(TR["hawaii1"]["t_splash"])}', WARN, False),
              (f'W of Chile     deorbit {fmt(TR["chile"]["t_burn"])} (orbit 7)  landing {fmt(TR["chile"]["t_splash"])}', OK, False),
-             (f'SW of Hawaii   deorbit {fmt(TR["hawaii2"]["t_burn"])} (orbit 14) splash {fmt(TR["hawaii2"]["t_splash"])}', VIOLET, False),
-             ('zones: Flight 14 warnings re-timed; late-Hawaii area from the model; none published', FGDIM, False)], x0=(0.010 if center is None else 0.57), y0=0.062, width=0.40, lh=0.024, fontsize=11*FS*1.1)
+             (f'NE of Hawaii   deorbit {fmt(TR["hawaii2"]["t_burn"])} (orbit 16) splash {fmt(TR["hawaii2"]["t_splash"])}', VIOLET, False),
+             ('areas: NAVAREA IV 1080, 1081/26 · HYDROPAC 3244, 3254, 3256, 3257/26 (7–9 Nov)', FGDIM, False)], x0=(0.010 if center is None else 0.57), y0=0.062, width=0.40, lh=0.024, fontsize=11*FS*1.1)
     legend2(ax, [('ascent', ORANGE, 2.2, '-', None, False), ('coast', ORANGE, 1.6, (0, (3, 3)), None, False), ('orbit', STEEL, 0.9, '-', None, False), ('return to Starbase', INK, 2.0, '-', None, False),
-                 ('contingency descent', WARN, 1.5, (0, (3, 3)), None, False), ('Sun 0°', SUN, 1.1, '-', None, False), ('Sun −12°', ACCENT, 1.0, '-', None, False), ('splashdown', INK, 0, 'none', '*', True)],
+                 ('contingency descent', WARN, 1.5, (0, (3, 3)), None, False), ('Sun 0°', SUN, 1.1, '-', None, False), ('Sun −12°', ACCENT, 1.0, '-', None, False), ('hazard area · window', WARN, 5, '-', None, False), ('splashdown', INK, 0, 'none', '*', True)],
             loc=('lower right' if center is None else 'upper left'), anchor=((1.0, 0.0) if center is None else (0.0, 1.0)))
     credit_outside(fig)
     out = O.ROOT/('flt15_mission_map.png' if center is None else 'flt15_mission_map_pacific.png'); fig.savefig(out, dpi=300, facecolor=BG); print('wrote', out)
@@ -138,6 +141,10 @@ def approach_map():
     fig, ax = new_fig(13.2, 8.4, 'Starship Flight 15 return to Starbase · 2026-11-14 21:17 UTC (catch, T0 22:45Z) · entry over the Pacific, approach over northern Mexico and south Texas')
     t_catch = T0 + np.timedelta64(int(T['catch']), 's')
     ext = (-120, -92, 20, 34); glon, glat, alt = draw_base(ax, ext, t_catch, grat=5, label_step=5); sun_lines(ax, glon, glat, alt)
+    zc = next(z for z in Z.ZONES if z['key'] == 'catch'); zc_pts = np.array(zc['ring'])
+    def catch_zone(a, lw=1.0):
+        a.add_patch(MPoly(zc_pts, closed=True, facecolor=zc['color'], alpha=0.22, edgecolor='none', zorder=4)); a.add_patch(MPoly(zc_pts, closed=True, facecolor='none', edgecolor=zc['color'], alpha=0.95, lw=lw, zorder=4))
+    catch_zone(ax); lab(ax, -96.25, 26.55, f"ship catch area\nNAVAREA IV 1081/26\n{zc['t0']}–{zc['t1']}Z 14–15 Nov", color=zc['color'], ha='left', va='bottom', linespacing=1.25)
     n = TR['nominal']; met = np.array(n['met']); lon = np.array(n['lon']); lat = np.array(n['lat']); al = np.array(n['alt']); sp = np.array(n['speed'])
     t_p = np.arange(T['deorb0'], T['catch'] + 600, 10.0); lo_p, la_p = orbit.lonlat(t_p/60, orbit.u_nominal(t_p/60)); plot_track(ax, lo_p, la_p, color=STEEL, lw=0.9, alpha=0.7, zorder=5)   # the pass, had the ship stayed in orbit
     plot_track(ax, lon, lat, color=INK, lw=2.2, alpha=0.95, zorder=6)
@@ -147,30 +154,36 @@ def approach_map():
             ax.plot(lon[j], lat[j], 'o', ms=4*FS*1.2, mfc=INK, mec='#05070a', zorder=7)
             rho, Tk, c = D.atmo(al[j]); lab(ax, lon[j] + 0.25, lat[j] - 0.35, f'{fmt(tm)[2:]}  {al[j]:.0f} km  M{sp[j]*1000/c:.0f}', size=8, va='top')
     for name, (la_, lo_) in {**D.PLACES, 'San Antonio': (29.42, -98.49), 'Houston': (29.76, -95.37), 'Mazatlán': (23.22, -106.41), 'La Paz': (24.14, -110.31), 'Torreón': (25.54, -103.44), 'Culiacán': (24.80, -107.39), 'Saltillo': (25.42, -101.0)}.items():
-        if name in ('Lihue (Kauai)', 'Honolulu', 'Hilo', 'South Padre Island'): continue
+        if name in ('Lihue (Kauai)', 'Honolulu', 'Hilo', 'South Padre Island', 'Raymondville', 'Port Mansfield'): continue
         if ext[0] < lo_ < ext[1] and ext[2] < la_ < ext[3]:
             ax.plot(lo_, la_, 'o', ms=3.2*FS*1.2, mfc='#cfd6dd', mec='#05070a', mew=0.6, zorder=7); lab(ax, lo_ + 0.18, la_ + 0.12, name, size=8, color='#e8eaed', va='bottom')
     ax.plot(*F.STARBASE, marker='^', ms=10*FS*1.2, mfc=DANGER, mec=(8/255, 10/255, 14/255, 0.9), mew=1, ls='none', zorder=8)
     lab(ax, F.STARBASE[0] - 0.35, F.STARBASE[1] - 0.45, f'Starbase · catch {fmt(T["catch"])}', ha='right', va='top')
     # inset: final approach
     ins = ax.inset_axes([0.015, 0.055, 0.37, 0.43]); ins.set_facecolor('#05070a'); ins.set_zorder(20)
-    iext = (-97.70, -96.85, 25.72, 26.40); S.draw_base(ins, iext, t_catch, grat=0.5, night=False, sun=False, label_step=10)
+    iext = (-97.95, -96.40, 25.75, 26.85); S.draw_base(ins, iext, t_catch, grat=0.5, night=False, sun=False, label_step=10); catch_zone(ins, lw=1.2)
     k = np.where((met >= n['overlay_from'] - 150))[0]; ins.plot(lon[k], lat[k], color=INK, lw=2.4, zorder=6); ins.set_xlim(iext[0], iext[1]); ins.set_ylim(iext[2], iext[3])
-    for tm in [T['transonic'], T['subsonic'], T['lb']]:
+    for tm in range(int(T['entry']) + 2*60, int(T['transonic']) - 30, 60):      # 1-minute marks inside the inset, up to the transonic square
+        j = int(np.argmin(np.abs(met - tm)))
+        if iext[0] < lon[j] < iext[1] and iext[2] < lat[j] < iext[3]:
+            ins.plot(lon[j], lat[j], 'o', ms=3.5*FS*1.2, mfc=INK, mec='#05070a', zorder=7); ins.text(lon[j] + 0.012, lat[j] + 0.006, f'{fmt(tm)[2:]}  {al[j]:.0f} km', color='#ffffff', fontsize=7.5*FS*1.15, path_effects=[HALO], zorder=9)
+    for tm, dy, va in [(T['transonic'], 0.012, 'bottom'), (T['subsonic'], 0.0, 'center'), (T['lb'], -0.012, 'top')]:
         j = int(np.argmin(np.abs(met - tm))); ins.plot(lon[j], lat[j], 's', ms=5*FS*1.2, mfc='none', mec=INK, mew=1.2, zorder=7)
-        ins.text(lon[j] + 0.012, lat[j] + 0.006, f'{fmt(tm)[2:]}  {al[j]:.0f} km', color='#ffffff', fontsize=7.5*FS*1.15, path_effects=[HALO], zorder=9)
+        ins.text(lon[j] + 0.014, lat[j] + dy, f'{fmt(tm)[2:]}  {al[j]:.0f} km', color='#ffffff', fontsize=7.5*FS*1.15, va=va, path_effects=[HALO], zorder=9)
     ins.plot(*F.STARBASE, marker='^', ms=9*FS*1.2, mfc=DANGER, mec='#05070a', zorder=8)
-    for name, (la_, lo_) in {'South Padre Island': (26.11, -97.17), 'Port Isabel': (26.07, -97.21), 'Brownsville': (25.90, -97.50), 'Laguna Madre': (26.30, -97.35)}.items():
+    for name, (la_, lo_) in {'South Padre Island': (26.11, -97.17), 'Port Isabel': (26.07, -97.21), 'Brownsville': (25.90, -97.50), 'Harlingen': (26.19, -97.70), 'Raymondville': (26.48, -97.78), 'Port Mansfield': (26.55, -97.43)}.items():
         ins.plot(lo_, la_, 'o', ms=3*FS*1.2, mfc='#cfd6dd', mec='#05070a', mew=0.5, zorder=7); ins.text(lo_ + 0.012, la_ + 0.008, name, color='#e8eaed', fontsize=7.5*FS*1.15, path_effects=[HALO], zorder=9)
-    ins.text(0.02, 0.97, 'final approach: north of South Padre Island,\nout over the Gulf, final turn south to the tower', transform=ins.transAxes, color=FG, fontsize=7.5*FS*1.15, va='top', path_effects=[HALO], zorder=9)
+    ins.text(-97.33, 26.30, 'Laguna Madre', color='#9fb3c8', fontsize=7*FS*1.15, style='italic', rotation=68, ha='center', va='center', path_effects=[HALO], zorder=9)
+    ins.text(0.98, 0.97, 'final approach: over the Laguna Madre north of South Padre Island,\nout over the Gulf, final turn south-west to the tower\nship catch hazard area NAVAREA IV 1081/26', transform=ins.transAxes, color=FG, fontsize=7.5*FS*1.15, va='top', ha='right', path_effects=[HALO], zorder=9)
     for s in ins.spines.values(): s.set_edgecolor('#8899aa')
     hud(ax, [('RETURN TO STARBASE · model', FG, True),
              (f'deorbit burn {fmt(T["deorb0"])}  {SOL["nominal"]["dv"]*1000:.0f} m/s, bank {SOL["nominal"]["sigma"]:.0f}° south', FG, False),
              (f'120 km {fmt(n["t_ei"])}   entry (80 km) {fmt(T["entry"])}   peak heating {fmt(n["peak_heating"])} {n["peak_heating_alt"]:.0f} km', FG, False),
              (f'max {n["max_g"]:.1f} g   transonic {fmt(T["transonic"])}   landing burn {fmt(T["lb"])}   catch {fmt(T["catch"])}', FG, False),
              ('orbital pass ~400 km N of Starbase; the glide banks south', FGDIM, False),
-             (f'last {D.START_KM:.0f} km re-shaped to the described approach', FGDIM, False)], x0=0.012, y0=0.495, width=0.37, lh=0.024, fontsize=11*FS*1.1)
-    legend2(ax, [('return glide (2-min marks: MET, height, Mach)', INK, 2.2, '-', None, False), ('orbital pass, no deorbit', STEEL, 0.9, '-', None, False), ('Sun 0°', SUN, 1.1, '-', None, False), ('Sun −12°', ACCENT, 1.0, '-', None, False)], loc='upper left', anchor=(0.0, 1.0))
+             (f'last {D.START_KM:.0f} km re-shaped to the described approach and the catch area', FGDIM, False)], x0=0.012, y0=0.495, width=0.37, lh=0.024, fontsize=11*FS*1.1)
+    legend2(ax, [('return glide (2-min marks: MET, height, Mach)', INK, 2.2, '-', None, False), ('orbital pass, no deorbit', STEEL, 0.9, '-', None, False), ('ship catch hazard area', CYAN, 5, '-', None, False),
+                 ('Sun 0°', SUN, 1.1, '-', None, False), ('Sun −12°', ACCENT, 1.0, '-', None, False)], loc='upper left', anchor=(0.0, 1.0))
     credit_outside(fig)
     out = O.ROOT/'flt15_catch_approach.png'; fig.savefig(out, dpi=300, facecolor=BG); print('wrote', out)
 

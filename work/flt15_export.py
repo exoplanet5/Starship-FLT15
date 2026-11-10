@@ -65,10 +65,10 @@ SUN = body_table('sun', T0_LO - timedelta(minutes=11), T0_HI + timedelta(seconds
 MOON = body_table('moon', T0_LO - timedelta(minutes=11), T0_HI + timedelta(seconds=END_MAX + 120), 'DE440s geometric Moon centre')
 
 # ---------------- shared metadata ----------------
-STACK = dict(total_m=123, burn_end=END_MAX + 1, segments=dict(booster=dict(len=71, w=9, kind='solid'), ship=dict(len=52, w=9, kind='starship')),
+STACK = dict(total_m=123, burn_end=END_MAX + 1, width_boost=1.4, segments=dict(booster=dict(len=71, w=9, kind='superheavy'), ship=dict(len=52, w=9, kind='starship')),
              states=[dict(until=T['hotstage'], segs=['booster', 'ship'], zoom=1, burn='liquid'), dict(segs=['ship'], zoom=1.9, burn='liquid')])
-COMPANION = dict(track='booster', label='Super Heavy', powered_intervals=[[T['bb0'], T['bb1']], [T['blb'], T['bcatch']]],
-                 stack=dict(total_m=71, burn_end=T['bcatch'], segments=dict(booster=dict(len=71, w=9, kind='solid')), states=[dict(segs=['booster'], zoom=1.0, burn='liquid')]))
+COMPANION = dict(track='booster', label='Super Heavy', tail_first=True, powered_intervals=[[T['bb0'], T['bb1']], [T['blb'], T['bcatch']]],
+                 stack=dict(total_m=71, burn_end=T['bcatch'], width_boost=1.4, segments=dict(booster=dict(len=71, w=9, kind='superheavy')), states=[dict(segs=['booster'], zoom=1.0, burn='liquid')]))
 CITIES = [['Houston', -95.37, 29.76, 1], ['San Antonio', -98.49, 29.42, 1], ['Dallas', -96.80, 32.78, 1], ['Austin', -97.74, 30.27, 1], ['New Orleans', -90.07, 29.95, 1],
           ['Monterrey', -100.31, 25.67, 1], ['Mexico City', -99.13, 19.43, 1], ['Guadalajara', -103.35, 20.67, 1], ['Los Angeles', -118.24, 34.05, 1], ['Phoenix', -112.07, 33.45, 1],
           ['Miami', -80.19, 25.76, 1], ['Havana', -82.38, 23.13, 1], ['Honolulu', -157.86, 21.31, 1], ['Perth', 115.86, -31.95, 1], ['Sydney', 151.21, -33.87, 1],

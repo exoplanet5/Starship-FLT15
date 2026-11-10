@@ -127,8 +127,9 @@ Ocean polygon with a slightly longer western end, HYDROPAC 3254/26 a wider versi
 ## The page
 
 `docs/` is a build of the launch-page template. Mission selector: nominal return, Indian Ocean, early Hawaii (orbit 2), Chile
-(orbit 7), late Hawaii (orbit 16). The ship is drawn with the Flight 14 Starship cartoon (nose cone, heat-shield side, flaps; it glints when
-sunlit), the booster as a plain stage with its own moving marker (template field `meta.companion`); the flight ends
+(orbit 7), late Hawaii (orbit 16). The ship is drawn in profile (ogive nose, tiled windward side, forward and aft flaps; it glints when
+sunlit), the booster with its hot-stage ring, grid fins and engine section on its own moving marker (template field
+`meta.companion`), engines-first on the way back; widths are drawn 1.4 times true scale so the shapes read at marker size; the flight ends
 with a descent (`meta.orbit_end_met`); all three were added to the template for this mission. Vehicle status, hazard-area
 table (impact times only for the profile shown), timeline with official and model events, synthetic TLE for the
 chosen T0, sky chart from any city or clicked point (home: South Padre Island), terminators, city lights, borders.

@@ -2,7 +2,10 @@
 atmosphere, Newtonian belly-first aerodynamics with the Flight 14 angle of attack and ballistic coefficient, bank steering, a
 10 s one-Raptor deorbit burn), every one started from the Flight 15 orbit (flt15_orbit):
 
-  nominal   deorbit burn T+21:35:57 (official); delta-v and a constant bank solved for the Pad 2 tower; landing burn 18 s (official)
+  nominal   deorbit burn T+21:35:57 (official); landing burn 18 s (official). Two stages: (1) delta-v, a constant bank and the orbit
+            period scale solved for the Pad 2 tower at the official catch time (this fixes the orbit for every descent); (2) with that
+            orbit, delta-v and a two-stage bank solved so that the path runs along the entry corridor over Mexico (NOTAM B4288/26,
+            areas C2 and C3) and covers the routed distance to the tower by the official catch time
   hawaii1   early Hawaii: orbit-2 burn at T+02:12:42 (Flight 14's T+02:12:00 re-timed by the 42 s later insertion), solved for
             Flight 14's splashdown point north of Hawaii (North Pacific zone)
   chile     mid-mission: orbit-7 burn at T+08:53:00 (Flight 14's planned T+08:52:18 re-timed), delta-v and bank solved for
@@ -12,14 +15,17 @@ atmosphere, Newtonian belly-first aerodynamics with the Flight 14 angle of attac
             solved for Flight 14's splashdown point north-east of Hawaii, inside the area's eastern lobe
   indian    no insertion burn: ballistic coast from SECO with the payload aboard, bank steering to the middle of the Indian Ocean zone
 
-The nominal track's last minutes are re-shaped kinematically to SpaceX's description of the approach and the ship-catch hazard area
-NAVAREA IV 1081/26 (Laguna Madre and Padre Island from 26.8 N down to the pad, the Gulf out to 96.4 W): over the Laguna Madre 65 km
-north of the South Padre Island town, out over the Gulf, final turn south-west to the tower; heights, speeds and times stay those of
-the simulation.
-Results are cached in descents.json; run with --solve to recompute (about 10 minutes)."""
+The nominal track east of 103.5 W is re-shaped kinematically, at equal length, to the published areas and SpaceX's description of
+the approach: through the east end of the Mexican corridor on the Rio Grande, over the Laguna Madre 57 km north of the South Padre
+Island town (ship-catch area NAVAREA IV 1081/26: Laguna Madre and Padre Island from 26.8 N down to the pad, the Gulf out to 96.4 W),
+out over the Gulf, final turn south-west to the tower; heights, speeds and times stay those of the simulation.
+Results are cached in descents.json; run with --solve to recompute (about 15 minutes), or with --corridor to redo only the nominal's
+corridor stage (about 4 minutes; the orbit and the contingencies stay)."""
 import sys, json, numpy as np
 from scipy.optimize import least_squares, brentq
 from scipy.interpolate import CubicHermiteSpline
+from shapely.geometry import LineString, Point
+from shapely.ops import unary_union
 sys.path.insert(0, '/Users/mickey/sda/starship-ITF-14/work'); sys.path.insert(0, '/Users/mickey/launch/Starship-FLT15/work')
 import ift14_fit as F, ift14_entry as E
 from ift14_atmo import atmo
@@ -37,7 +43,8 @@ T_BURN_CHILE = 8*3600 + 53*60 + 0.0
 PLACES = {'Lihue (Kauai)': (21.98, -159.37), 'Honolulu': (21.31, -157.86), 'Hilo': (19.72, -155.09), 'Hermosillo': (29.07, -110.96),
           'Chihuahua': (28.63, -106.08), 'Ciudad Juarez / El Paso': (31.74, -106.49), 'Monterrey': (25.67, -100.31), 'Laredo': (27.51, -99.51),
           'Monclova': (26.9, -101.42), 'Reynosa / McAllen': (26.1, -98.3), 'Harlingen': (26.19, -97.70), 'Brownsville': (25.9, -97.5),
-          'South Padre Island': (26.11, -97.17), 'Corpus Christi': (27.8, -97.4), 'Raymondville': (26.48, -97.78), 'Port Mansfield': (26.55, -97.43)}
+          'South Padre Island': (26.11, -97.17), 'Corpus Christi': (27.8, -97.4), 'Raymondville': (26.48, -97.78), 'Port Mansfield': (26.55, -97.43),
+          'Piedras Negras / Eagle Pass': (28.70, -100.52), 'Nuevo Laredo': (27.49, -99.52), 'Ojinaga / Presidio': (29.56, -104.41)}
 
 class Sim15(E.Sim):
     """Flight 14's ship started from a given ECEF state; optional second bank sigma2 after t_rev (default: a reversal)"""
@@ -113,7 +120,7 @@ def solve_indian():
     return dict(dv=0.0, sigma=float(x[0]), t_rev=float(x[1]), t_burn=1e9, lb_dur=LB_SEA_S, beta=float(beta), target=[lat_t, lon_t])
 
 def make_sim(p, start):
-    return Sim15(p['dv'], p['sigma'], p['t_rev'], p['t_burn'], start, lb_dur=p['lb_dur'], beta=p.get('beta', BETA))
+    return Sim15(p['dv'], p['sigma'], p['t_rev'], p['t_burn'], start, sigma2=p.get('sigma2'), lb_dur=p['lb_dur'], beta=p.get('beta', BETA))
 
 def sample(sim, t_from, dt=2.0):
     """dt track from t_from to the landing (last sample = the landing point), events, loads and the lon/lat/alt/speed arrays"""
@@ -152,35 +159,75 @@ def nearby(met, lon, lat, alt):
         if d[i] < 400: near[name] = dict(km=round(float(d[i]), 1), met=float(met[i]), alt=round(float(alt[i]), 1))
     return near
 
-# ---- final approach: SpaceX's description laid over the simulated profile ----
+# ---- the entry corridor over Mexico and the final approach: the published areas and SpaceX's description laid over the simulated profile ----
+CORRIDOR = unary_union([Z.ZD['mexC2']['poly'], Z.ZD['mexC3']['poly']])     # NOTAM B4288/26: Pacific off Baja California (120.6 W) to the Rio Grande (99.9 W)
+CORR_LONS = np.arange(-119.5, -100.4, 1.0)
+def _cut(L): c = CORRIDOR.intersection(LineString([(L, 0), (L, 60)])); return c.bounds[1], c.bounds[3]
+CORR_EDGE = np.array([_cut(L) for L in CORR_LONS]); CORR_CEN = CORR_EDGE.mean(axis=1); CORR_HALF = (CORR_EDGE[:, 1] - CORR_EDGE[:, 0])*55.6   # km
+W_BORDER, AZ_BORDER = (27.942, -99.942), 108.0        # middle of the corridor's east end on the Rio Grande (28-04N 100-01W to 27-49N 099-52W), 64 km north-west of Laredo; its axis there
 W_LAGUNA, W_GULF = (26.62, -97.35), (26.18, -96.85)   # over the Laguna Madre and Padre Island 57 km north of the South Padre Island town (the hazard
-START_KM = 350.0                                       # area's northern tip is 26.77 N 97.47 W); over the Gulf 36 km north-east of the tower before the final turn
-def approach_overlay(tr):
-    """re-shape the ground path of the nominal descent over its last START_KM so that it reaches the Laguna Madre well north of South
-    Padre Island heading south-east, runs out over the Gulf and turns south-west to the tower, inside the ship-catch hazard area;
-    heights, speeds and times stay those of the simulation and the horizontal spacing is stretched by the ratio of the new path
-    length to the simulated one (reported as overlay_stretch)"""
-    lat_t, lon_t = TOWER; kx, ky = 111.2*np.cos(np.radians(lat_t)), 111.2
-    x = (np.array(tr['lon']) - lon_t)*kx; y = (np.array(tr['lat']) - lat_t)*ky; met = np.array(tr['met'])
-    dist = np.r_[0, np.cumsum(np.hypot(np.diff(x), np.diff(y)))]; rem = dist[-1] - dist
-    k = int(np.argmin(np.abs(rem - START_KM)))
-    p0 = np.array([x[k], y[k]]); d0 = np.array([x[k + 1] - x[k], y[k + 1] - y[k]]); d0 /= np.linalg.norm(d0)
-    w1 = np.array([(W_LAGUNA[1] - lon_t)*kx, (W_LAGUNA[0] - lat_t)*ky]); w2 = np.array([(W_GULF[1] - lon_t)*kx, (W_GULF[0] - lat_t)*ky]); w3 = np.zeros(2)
-    P = np.array([p0, w1, w2, w3]); seg = np.linalg.norm(np.diff(P, axis=0), axis=1); u = np.r_[0, np.cumsum(seg)]
+START_LON = -103.5                                     # area's northern tip is 26.77 N 97.47 W); over the Gulf 36 km north-east of the tower before the final turn
+def path_km(lon, lat):
+    lon, lat = np.asarray(lon), np.asarray(lat); dl = (np.diff(lon) + 540) % 360 - 180
+    return np.r_[0, np.cumsum(np.hypot(dl*111.2*np.cos(np.radians(0.5*(lat[1:] + lat[:-1]))), np.diff(lat)*111.2))]
+def route(lon0, lat0, lon1, lat1):
+    """the re-shaped ground path from a point of the simulated track (heading toward lon1, lat1): corridor east end, Laguna Madre,
+    Gulf, tower, on a chord-length Hermite with unit tangents -> dense lon, lat and the cumulative length in km"""
+    lat_t, lon_t = TOWER; kx, ky = 111.2*np.cos(np.radians(lat_t)), 111.2; xy = lambda la, lo: np.array([(lo - lon_t)*kx, (la - lat_t)*ky])
+    p0 = xy(lat0, lon0); d0 = xy(lat1, lon1) - p0; d0 /= np.linalg.norm(d0)
+    P = np.array([p0, xy(*W_BORDER), xy(*W_LAGUNA), xy(*W_GULF), np.zeros(2)]); u = np.r_[0, np.cumsum(np.linalg.norm(np.diff(P, axis=0), axis=1))]
     az = lambda a: np.array([np.sin(np.radians(a)), np.cos(np.radians(a))])
-    Dv = np.array([d0, az(140), az(200), az(235)])        # unit tangents: u is the chord length, so |dP/du| ~ 1
-    spl = CubicHermiteSpline(u, P, Dv); uu = np.linspace(0, u[-1], 6000); Cc = spl(uu)
-    L = np.r_[0, np.cumsum(np.linalg.norm(np.diff(Cc, axis=0), axis=1))]; stretch = L[-1]/rem[k]
-    d = np.minimum((dist[k:] - dist[k])*stretch, L[-1])
-    xn = np.interp(d, L, Cc[:, 0]); yn = np.interp(d, L, Cc[:, 1])
-    lon = np.array(tr['lon']); lat = np.array(tr['lat']); lon[k:] = lon_t + xn/kx; lat[k:] = lat_t + yn/ky
-    tr['lon'], tr['lat'] = lon.tolist(), lat.tolist(); tr['overlay_from'] = float(met[k]); tr['overlay_stretch'] = float(stretch); tr['splash'] = [float(lon[-1]), float(lat[-1])]
-    tr['near'] = nearby(met, lon, lat, np.array(tr['alt']))        # closest approaches of the re-shaped path (the land part west of 99 W is the simulation's)
+    Cc = CubicHermiteSpline(u, P, np.array([d0, az(AZ_BORDER), az(140), az(200), az(235)]))(np.linspace(0, u[-1], 8000))   # u is the chord length, so |dP/du| ~ 1
+    lo, la = lon_t + Cc[:, 0]/kx, lat_t + Cc[:, 1]/ky; return lo, la, path_km(lo, la)
+def reshape(met, lon, lat, t_from):
+    """lay the route over a sampled track from its first point east of START_LON (after t_from): new lon, lat, the start index, and
+    the route length over the simulated distance left at that point (1 when the simulation flies the routed distance)"""
+    met, lon, lat = np.asarray(met), np.array(lon, float), np.array(lat, float)
+    k = int(np.argmax((met > t_from) & (lon > START_LON) & (lon < -60))); dist = path_km(lon, lat); rem = dist[-1] - dist[k]
+    rl, ra, L = route(lon[k], lat[k], lon[k + 1], lat[k + 1]); stretch = L[-1]/rem
+    d = np.minimum((dist[k:] - dist[k])*stretch, L[-1]); lon[k:] = np.interp(d, L, rl); lat[k:] = np.interp(d, L, ra)
+    return lon, lat, k, float(stretch), float(rem)
+def approach_overlay(tr):
+    """re-shape the ground path of the nominal descent east of START_LON so that it leaves Mexico through the middle of the corridor's
+    east end, reaches the Laguna Madre well north of South Padre Island heading south-east, runs out over the Gulf and turns south-west
+    to the tower, inside the ship-catch hazard area; heights, speeds and times stay those of the simulation. The simulation is solved to
+    fly this routed distance (solve_corridor), so the horizontal spacing is kept (overlay_stretch = 1 to the solver's tolerance)"""
+    lon, lat, k, stretch, rem = reshape(tr['met'], tr['lon'], tr['lat'], tr['t_ei'])
+    tr['sim_end'] = [float(tr['lon'][-1]), float(tr['lat'][-1])]                # where the un-routed simulation comes down
+    tr['lon'], tr['lat'] = lon.tolist(), lat.tolist(); tr['overlay_from'] = float(tr['met'][k]); tr['overlay_km'] = rem; tr['overlay_stretch'] = stretch; tr['splash'] = [float(lon[-1]), float(lat[-1])]
+    tr['near'] = nearby(np.array(tr['met']), lon, lat, np.array(tr['alt']))     # closest approaches of the re-shaped path
     return tr
+def corridor_offsets(lon, lat):
+    """north-south offset (km, + north) of a track from the corridor's centreline at CORR_LONS"""
+    lon, lat = np.asarray(lon), np.asarray(lat); m = (lon > -125) & (lon < -98); o = np.argsort(lon[m]); return (np.interp(CORR_LONS, lon[m][o], lat[m][o]) - CORR_CEN)*111.2
+def solve_corridor(direct):
+    """second stage of the nominal: the orbit (period scale) stays as solved for the direct path; delta-v, a first bank, a second bank
+    and the switch time are solved so that (1) the catch is at the official time, (2) the simulated distance east of START_LON equals the
+    routed distance to the tower (corridor east end, Laguna Madre, Gulf), and (3) the path follows the centreline of the Mexican entry
+    corridor, each offset weighted by the local half-width. A single bank cannot do this: the corridor keeps within ~30 km of the orbital
+    ground track until 120 W and has turned 230 km south of it by the Rio Grande"""
+    tb = T['deorb0']; st = orbit_start(tb); best = None; direct = direct.get('direct', direct)
+    def run(p): return Sim15(p[0], p[1], p[3], tb, st, sigma2=p[2], lb_dur=LB_CATCH_S).run(record=True)
+    def track(s):
+        tt = np.arange(s.t_ei, s.t_lb, 2.0); ys = s.sol.sol(tt); g = np.array([E.geodetic(ys[:3, i]) for i in range(len(tt))])
+        return np.r_[tt, s.t_splash], np.r_[g[:, 1], s.splash[1]], np.r_[g[:, 0], s.splash[0]]
+    def res(p):
+        s = run(p)
+        if nan_lb(s): return np.r_[1e3, 1e3, np.full(len(CORR_LONS), 1e2)]
+        tt, lo, la = track(s); _, _, _, stretch, rem = reshape(tt, lo, la, s.t_ei)
+        return np.r_[(s.t_splash - T['catch'])/0.05, (stretch - 1)*rem/0.2, corridor_offsets(lo[:-1], la[:-1])/(0.3*CORR_HALF)]
+    for x0 in ([direct['dv'] + 1.7e-4, 11.0, 27.0, T['entry'] + 500], [direct['dv'], 7.0, 26.0, T['entry'] + 390]):
+        r = least_squares(res, x0, x_scale=[0.003, 8, 8, 120], bounds=([0.03, -60, -60, T['entry']], [0.12, 60, 80, T['catch'] - 120]), diff_step=[2e-3, 5e-3, 5e-3, 3e-4], max_nfev=80)
+        print(f'    start {np.round(x0, 3)} -> dv {r.x[0]*1000:.3f} m/s bank {r.x[1]:.2f} -> {r.x[2]:.2f} at {fmt(r.x[3])}; catch {r.fun[0]*0.05:+.3f} s, routed distance {r.fun[1]*0.2:+.3f} km, '
+              f'corridor offsets {np.round(r.fun[2:]*0.3*CORR_HALF).astype(int)} km, cost {r.cost:.2f}', flush=True)
+        if best is None or r.cost < best.cost: best = r
+    x = best.x
+    return dict(dv=float(x[0]), sigma=float(x[1]), sigma2=float(x[2]), t_rev=float(x[3]), direct=dict(dv=direct['dv'], sigma=direct['sigma']))
 
-def build(solve=False):
+def build(solve=False, corridor=False):
     cache = json.load(open(CACHE)) if CACHE.exists() and not solve else {}
     sol = cache.get('solutions', {})
+    if corridor and 'nominal' in sol: sol['nominal'].pop('sigma2', None)      # redo only the nominal's corridor stage
     global orbit
     for key, fn in [('nominal', solve_nominal), ('hawaii1', solve_hawaii1), ('chile', solve_chile), ('hawaii2', solve_hawaii2), ('indian', solve_indian)]:
         if key not in sol:
@@ -189,24 +236,28 @@ def build(solve=False):
         if key == 'nominal':                     # every other descent starts from the orbit with the solved period scale
             json.dump(dict(period_scale=sol['nominal']['period_scale']), open(O.PHASE_FILE, 'w'))
             O.PERIOD_SCALE = sol['nominal']['period_scale']; O.orbit = orbit = O.Orbit(F.inc_fit, F.dlon_fit, O.PERIOD_SCALE)
-    if 'tracks' not in cache or solve:
-        tr = {}
+            if 'sigma2' not in sol['nominal']:   # second stage, on the orbit just fixed: along the Mexican corridor and the routed approach
+                print('solving nominal, corridor stage ...', flush=True); sol['nominal'].update(solve_corridor(sol['nominal'])); print(f"  nominal: {sol['nominal']}", flush=True)
+                cache.get('tracks', {}).pop('nominal', None); cache['solutions'] = sol; json.dump(cache, open(CACHE, 'w'), default=float)
+    tr = {} if solve else cache.get('tracks', {})
+    if any(key not in tr for key in sol):
         for key, p in sol.items():
+            if key in tr: continue
             start = orbit.seco_state() if key == 'indian' else orbit_start(p['t_burn'])
             tr[key] = sample(make_sim(p, start), T['seco'] if key == 'indian' else p['t_burn'])
             print(f'  sampled {key}: {len(tr[key]["met"])} pts, splash {fmt(tr[key]["t_splash"])}', flush=True)
-        tr['nominal'] = approach_overlay(tr['nominal'])
+            if key == 'nominal': tr[key] = approach_overlay(tr[key])
         cache['tracks'] = tr; cache['vehicle'] = dict(alpha=ALPHA, beta=BETA, m_entry_t=M_ENTRY, payload_t=PAYLOAD_T, burn_s=BURN_S)
         json.dump(cache, open(CACHE, 'w'), default=float)
     return cache
 
 if __name__ == '__main__':
-    C = build(solve='--solve' in sys.argv)
+    C = build(solve='--solve' in sys.argv, corridor='--corridor' in sys.argv)
     ZONE = {'nominal': 'catch', 'hawaii1': 'npac1', 'hawaii2': 'late', 'chile': 'chile', 'indian': 'indian'}
     for key, tr in C['tracks'].items():
         p = C['solutions'][key]; zk = ZONE[key]
         inz = Z.contains(Z.ZD[zk], *tr['splash'])
-        print(f"{key:8s} dv {p['dv']*1000:5.1f} m/s bank {p['sigma']:6.1f} deg{' period scale %+.5f (T_nodal %.3f min)' % (p['period_scale'], orbit.T_nodal) if 'period_scale' in p else ''} rev {fmt(p['t_rev']) if p['t_rev'] < 1e8 else '-'} | burn {fmt(tr['t_burn']) if tr['t_burn'] else '-'} @ {tr['burn'][1]:.1f},{tr['burn'][0]:.1f} "
+        print(f"{key:8s} dv {p['dv']*1000:5.1f} m/s bank {p['sigma']:6.1f} deg{' then %.1f deg from %s' % (p['sigma2'], fmt(p['t_rev'])) if p.get('sigma2') is not None else ''}{' period scale %+.5f (T_nodal %.3f min)' % (p['period_scale'], orbit.T_nodal) if 'period_scale' in p else ''} rev {fmt(p['t_rev']) if p['t_rev'] < 1e8 and p.get('sigma2') is None else '-'} | burn {fmt(tr['t_burn']) if tr['t_burn'] else '-'} @ {tr['burn'][1]:.1f},{tr['burn'][0]:.1f} "
               f"| 120 km {fmt(tr['t_ei'])} @ {tr['ei'][1]:.1f},{tr['ei'][0]:.1f} | peak heat {fmt(tr['peak_heating'])} {tr['peak_heating_alt']} km | max {tr['max_g']} g {fmt(tr['t_max_g'])} "
               f"| M5 {fmt(tr['mach5'])} transonic {fmt(tr['transonic'])} subsonic {fmt(tr['subsonic'])} LB {fmt(tr['landing_burn'])} | end {fmt(tr['t_splash'])} @ {tr['splash'][1]:.3f},{tr['splash'][0]:.3f} in zone {inz}")
         if tr.get('alt_at_official_entry') is not None: print(f"          altitude at the official entry {fmt(T['entry'])}: {tr['alt_at_official_entry']:.1f} km")
@@ -216,6 +267,14 @@ if __name__ == '__main__':
                                                                f"window {Z.ZD[zk]['t0']}-{Z.ZD[zk]['t1']}Z = {fmt(a)}-{fmt(b)} after a 22:45Z launch, {fmt(c)}-{fmt(d)} after 00:00Z")
         else: print(f"          never inside {Z.ZD[zk]['name']}")
         for n, q in tr['near'].items(): print(f"          near {n:24s} {q['km']:6.1f} km at {fmt(q['met'])}  alt {q['alt']:.1f} km")
-    n = C['tracks']['nominal']
+    n = C['tracks']['nominal']; met, lon, lat, alt = map(np.array, (n['met'], n['lon'], n['lat'], n['alt']))
+    for zk in ('mexC2', 'mexC3'):
+        z = Z.ZD[zk]; (a, b), (c, d) = Z.window_met(z)
+        for t_in, t_out in Z.crossings(z, met, lon, lat):
+            i, j = np.searchsorted(met, [t_in, t_out]); print(f"nominal in {z['name']} from {fmt(t_in)} ({lon[i]:.2f}, {lat[i]:.2f}, {alt[i]:.0f} km) to {fmt(t_out)} ({lon[j]:.2f}, {lat[j]:.2f}, {alt[j]:.0f} km); "
+                                                              f"window {z['t0']}-{z['t1']}Z = {fmt(a)}-{fmt(b)} after a 22:45Z launch, {fmt(c)}-{fmt(d)} after 00:00Z")
+    m = (met > n['t_ei']) & (lon > -121) & (lon < -99.9); off = corridor_offsets(lon[m], lat[m])
+    print('  offset from the corridor centreline (km, + north) / half-width, every 1 deg from 119.5 W to 100.5 W:\n   ', ' '.join(f'{o:+.0f}/{h:.0f}' for o, h in zip(off, CORR_HALF)))
+    print(f"  re-shaped from {fmt(n['overlay_from'])} ({n['overlay_km']:.0f} km to go, route/simulated x{n['overlay_stretch']:.4f}); the un-routed simulation ends at {n['sim_end'][1]:.3f} N {-n['sim_end'][0]:.3f} W")
     print(f"nominal vs official: transonic {fmt(n['transonic'])} vs {fmt(T['transonic'])}, subsonic {fmt(n['subsonic'])} vs {fmt(T['subsonic'])}, "
-          f"landing burn {fmt(n['landing_burn'])} vs {fmt(T['lb'])}, catch {fmt(n['t_splash'])} vs {fmt(T['catch'])}; overlay from {fmt(n['overlay_from'])}, path stretch x{n['overlay_stretch']:.3f}")
+          f"landing burn {fmt(n['landing_burn'])} vs {fmt(T['lb'])}, catch {fmt(n['t_splash'])} vs {fmt(T['catch'])}")

@@ -2,8 +2,8 @@
 
 Pre-launch model of **Starship Flight 15**, the first flight planned to return both stages to Starbase for a catch:
 Super Heavy at T+06:35 and the ship at T+22:32:34 after about 14 orbits. Built from the official flight timeline and
-mission description (spacex.com, 7 Nov 2026) and the six Flight 15 navigational warnings (NGA, 7–9 Nov 2026) on top of
-the Flight 14 model (orbit plane fitted to the September navigational warnings, ship calibrated on Flight 14's
+mission description (spacex.com, 7 Nov 2026), the six Flight 15 navigational warnings (NGA, 7–9 Nov 2026) and the
+Mexican NOTAM for the ship's return (B4288/26, added 12 Nov) on top of the Flight 14 model (orbit plane fitted to the September navigational warnings, ship calibrated on Flight 14's
 reconstructed entry). Launch window 13 Nov 2026 22:45–00:00 UTC (16:45–18:00 CST), Pad 2. **A model from public
 information, not telemetry and not an official ephemeris.**
 
@@ -22,7 +22,7 @@ return and the four ocean contingencies.
 | `flt15_catch_approach.png` | the return over the Pacific, northern Mexico and south Texas, with 2-minute marks (height, Mach) and an inset of the final approach to the tower |
 | `flt15_tle.txt` | SGP4 TLE fitted to the model orbit for a 22:45Z launch (placeholder 99995, not observed) |
 | `flight-timeline.txt` | official Flight 15 timeline |
-| `navwarning/` | the six Flight 15 warnings (NGA text as issued) with a note on their windows |
+| `navwarning/` | the six Flight 15 warnings (NGA text as issued) and the Mexican NOTAM B4288/26, with a note on their windows |
 | `export/` | mission JSON files as written by `work/flt15_export.py` (copied into `docs/data/` by the template's `new_page.py`) |
 | `work/` | Python: orbit and ascent (`flt15_orbit.py`), descents (`flt15_descents.py`), zones, TLE, maps, export |
 
@@ -43,15 +43,16 @@ options around Hawaii and a mid-mission option off Chile, the precleared areas u
 **Orbit plane.** Flight 14's fit to the September 2026 warnings (`~/sda/starship-ITF-14`): i = 30.58°, 275 km circular
 with J2 secular rates, node 2.1° east of the pad, the ascent steering into the plane. SpaceX says Flight 15 flies the
 same altitude and inclination. One free parameter was added: the orbital rate is scaled by +0.00134 (nodal period
-89.63 min instead of 89.75, the same as a 269 km mean orbit), solved together with the deorbit Δv and bank so that
-the modeled catch happens at the official T+22:32:34. It absorbs the assumed SECO downrange (15°), the mean altitude
+89.63 min instead of 89.75, the same as a 269 km mean orbit), solved together with the deorbit Δv and a single bank
+straight to the tower so that the modeled catch happens at the official T+22:32:34 (the return itself was then
+re-solved on this orbit along the Mexican corridor, below). It absorbs the assumed SECO downrange (15°), the mean altitude
 (Flight 14's deorbit telemetry read 270 km against that model's 275) and the Flight 15 ascent differences. With it,
 the modeled landing burn and catch match the official times to the second and transonic within 25 s.
 
 **Why the return works.** The ground track shifts 22.9° west per orbit; on the 15th pass after insertion the orbit
 crosses Starbase's longitude at 29.6°N, about 400 km north of the pad, having crossed the Kauai Channel at about 80 km.
-The ship banks ~20° south through the glide to reach the tower, exactly as Flight 14's reconstructed entry reached a
-splashdown 395 km south of its track.
+The ship banks south through the glide to reach the tower, as Flight 14's reconstructed entry reached a splashdown
+395 km south of its track; how the turn is spread along the glide comes from the Mexican corridor.
 
 **Ascent.** The Flight 14 ground path (cubic Hermite, pad at rest to the SECO state) re-timed along its arc length with
 a shaped distance profile through telemetry-like anchors (Max Q 11.5 km at T+0:58, MECO 66 km and 1.5 km/s at T+2:19,
@@ -71,29 +72,45 @@ orbit state at the burn time.
 
 | profile | deorbit burn | Δv, bank | 120 km | peak heating | max g | end |
 |---|---|---|---|---|---|---|
-| nominal, catch at Pad 2 | T+21:35:57 at 30.7°S 76.4°E | 69.2 m/s, 20.0° S | T+22:02:25 at 7.7°N 174.9°E | T+22:17:31, 72 km | 1.71 | catch T+22:32:34 |
+| nominal, catch at Pad 2 | T+21:35:57 at 30.7°S 76.4°E | 69.3 m/s, 11.3° S, then 27.1° S from T+22:19:07 | T+22:02:23 at 7.6°N 174.7°E | T+22:17:39, 72 km | 1.78 | catch T+22:32:34 |
 | Indian Ocean, no insertion | — (coast from SECO, payload aboard) | 0, bank 82° reversed T+51:28 | T+45:58 at 29.1°S 58.8°E | T+51:04, 56 km | 5.7 | splash T+56:16 at 21.4°S 84.9°E (middle of the area) |
 | early Hawaii, orbit 2 | T+02:12:42 at 30.6°S 23.0°E | 71.0 m/s, 19.5° S | T+02:38:42 at 10.6°N 117.7°E | T+02:53:23, 72 km | 1.70 | splash T+03:08:19 at 25.50°N 155.43°W (Flight 14's point) |
 | mid-mission Chile, orbit 7 | T+08:53:00 at 30.6°N 86.5°E | 71.2 m/s, lift up | T+09:18:56 at 4.4°S 175.6°W | T+09:33:46, 72 km | 1.64 | landing T+09:49:46 at 29.9°S 86.9°W (Flight 14's planned point) |
 | late Hawaii, orbit 16 | T+22:57:47 at 25.4°S 20.5°E | 69 m/s (fixed), 19.3° S | T+23:24:11 at 8.3°S 126.5°E | T+23:38:50, 72 km | 1.70 | splash T+23:53:51 at 25.50°N 155.43°W (Flight 14's point) |
 
-Nominal against the official timeline: 81 km at the official "entry" (Flight 14's reconstruction put that marker at
-81–86 km), transonic T+22:29:59 vs 22:29:34, subsonic 22:30:12 vs 22:30:13, landing burn and catch exact. Closest
-approaches of the nominal glide (the simulation's west of 100°W, the re-shaped approach east of it): Honolulu 49 km
-and Lihue 81 km at 79 km altitude; Hermosillo 40 km at 64 km; Chihuahua 18 km at 61 km; Laredo 28 km at 50 km;
-Monterrey 188 km; Reynosa/McAllen 105 km at 45 km; Harlingen 59 km at 41 km; Raymondville 42 km at 43 km; Port
-Mansfield 11 km at 42 km; South Padre Island 12 km at 21 km; the tower is 36 km from Brownsville. The constant bank is
-a model choice: SpaceX describes small turns over sparsely populated areas, so the real corridor over Chihuahua and the
-Valley will differ.
+Nominal against the official timeline: 82 km at the official "entry" (Flight 14's reconstruction put that marker at
+81–86 km), transonic T+22:30:00 vs 22:29:34, subsonic 22:30:12 vs 22:30:13, landing burn and catch exact. Closest
+approaches of the nominal glide (the simulation's west of 103.5°W, the re-shaped path east of it): Honolulu 52 km
+and Lihue 79 km at 80 km altitude; Hermosillo 95 km at 65 km; Chihuahua 78 km at 62 km; Ojinaga/Presidio 57 km at
+61 km; Piedras Negras/Eagle Pass 63 km at 54 km; Laredo 31 km at 51 km; Monterrey 251 km; Reynosa/McAllen 109 km at
+44 km; Harlingen 59 km at 42 km; Raymondville 42 km at 44 km; Port Mansfield 11 km at 43 km; South Padre Island 12 km
+at 22 km; the tower is 36 km from Brownsville.
 
-**Final approach.** The last 350 km of the nominal ground path are re-shaped to SpaceX's description and to the
-ship-catch hazard area NAVAREA IV 1081/26, a strip over the Laguna Madre and Padre Island from 26.77°N down to the pad
-plus a wedge of Gulf out to 96.4°W: the path reaches the lagoon 57 km north of the South Padre Island town (26.62°N,
-42 km altitude, Mach 4.5) heading south-east, runs out over the Gulf to 36 km north-east of the tower (33 km altitude,
-Mach 2.5), and turns south-west to the tower, reached at 15 km altitude for the vertical belly flop. The ship is inside
-the catch area from T+22:28:09 (42 km). Heights, speeds and times are the simulation's; the horizontal spacing is
-stretched 21 %, so the apparent ground speed over those last minutes is that much too high. The simulation's own
-constant-bank path would reach the tower straight from the west-north-west over Harlingen.
+**Entry corridor over Mexico (NOTAM B4288/26, 12 Nov).** The Mexico FIR notice closes two adjoining areas, C2 and C3,
+from the surface to unlimited, 2056–0014Z daily from 14 Nov: a corridor 20 to 80 km wide from the Pacific off Baja
+California (120.6°W, 30.5°N) across the peninsula, the Gulf of California, Sonora, Chihuahua and Coahuila to the Rio
+Grande 64 km north-west of Laredo (99.9°W, 27.9°N). Its west end is cut by the FIR boundary and its east end by the
+border, so it is one piece of a longer strip (no C1, and no notice for Texas, is in the model). Checked against the
+model as it stood: the window fits (it opens at 2056Z, the official entry time T+22:10:46 after a 22:45Z launch, and
+closes with the ship-catch area at 0014Z), the direction fits (the modeled path and the corridor axis turn together
+from 090° to 108°), but the single 20° bank ran parallel to the corridor 50 to 70 km south of its centreline, outside
+it by 15 to 60 km all the way. The corridor stays within about 30 km of the orbital ground track until 120°W and is
+230 km south of it at the Rio Grande: the ship turns later and harder than a single bank does. The nominal was
+therefore re-solved on the same orbit: Δv 69.3 m/s, bank 11.3° until T+22:19:07 (121°W, just before the corridor),
+27.1° after, found by least squares for the official catch time, the routed distance to the tower (next paragraph) and
+the corridor centreline. The path is now inside the corridor from T+22:19:27 (120.0°W, 72 km) to T+22:26:05 (the Rio
+Grande, 53 km, Mach 10), within 15 km of the centreline and at least 8 km from either edge. It moved 39 km north at
+120°W and 68 km north at 100°W; over Hawaii it moved 2 km. The orbit, the contingencies and the TLE are unchanged.
+
+**Final approach.** East of 103.5°W (T+22:24:29, 770 km to go) the ground path is drawn rather than simulated: through
+the middle of the corridor's east end on the Rio Grande, across south Texas to the ship-catch hazard area
+NAVAREA IV 1081/26 (a strip over the Laguna Madre and Padre Island from 26.77°N down to the pad plus a wedge of Gulf
+out to 96.4°W), reaching the lagoon 57 km north of the South Padre Island town (26.62°N, 43 km altitude, Mach 5.5)
+heading south-east, out over the Gulf to 36 km north-east of the tower (36 km altitude, Mach 3), and a turn south-west
+to the tower, reached at about 18 km altitude for the vertical belly flop. The ship is inside the catch area from
+T+22:27:57 (44 km). The simulation is solved to fly exactly this routed distance (its own two-bank path comes down
+74 km east of the tower), so heights, speeds, times and the spacing along the path are the simulation's; the earlier
+version stretched the last 350 km by 21 %.
 
 **Late Hawaii.** HYDROPAC 3256/26 runs from Micronesia (9°N 154°E) to north-east of Hawaii and opens at 22:17Z on
 14 Nov, i.e. T+23:32 after a 22:45Z launch: one orbit after the nominal entry, so the late option is the pass *after*
@@ -108,7 +125,8 @@ placed this option on the 14th orbit, short of the islands; that descent lies in
 
 ## Hazard areas and windows
 
-The polygons and windows are the Flight 15 warnings issued 7–9 Nov 2026, parsed from the NGA text in `navwarning/`.
+The polygons and windows are the Flight 15 warnings issued 7–9 Nov 2026 and the Mexican NOTAM B4288/26, parsed from
+the text in `navwarning/`.
 The 14–20 Nov windows belong to the 13–19 Nov launch dates (the launch window is 22:45–00:00Z). Relative to a 22:45Z
 launch each contingency window opens within a minute of the moment the modeled descent enters its area at about 80 km,
 and closes about one orbit plus 20 min after the first-pass splashdown, so each covers two consecutive passes; the
@@ -119,6 +137,7 @@ Ocean polygon with a slightly longer western end, HYDROPAC 3254/26 a wider versi
 |---|---|---|---|---|
 | NAVAREA IV 1080/26 A, B | Gulf of America, Yucatán Channel, Caribbean south of Cuba; off Starbase | 2245–0040Z 13 Nov, alt. daily 14–19 Nov | T+0:00–1:55 | ascent; Super Heavy return |
 | NAVAREA IV 1081/26 | Laguna Madre, Padre Island, Gulf off Starbase (ship catch) | 2108–0014Z 14–15 Nov, alt. daily 15–20 Nov | T+22:23–25:29 | final approach from T+22:28:09, catch T+22:32:34 |
+| NOTAM B4288/26 C2, C3 | Mexico FIR, SFC–UNL: Pacific off Baja California to the Rio Grande north-west of Laredo (ship entry corridor) | 2056–0014Z daily 14–20 Nov | T+22:11–25:29 | nominal entry: in C2 T+22:19:27 (72 km), C3 T+22:22:41 (63 km), out over the Rio Grande T+22:26:05 (53 km) |
 | HYDROPAC 3244/26 | eastern Indian Ocean | 2253–0114Z daily 13–19 Nov | T+0:08–2:29 | no insertion: in the area T+48:57, splash T+56:16 |
 | HYDROPAC 3257/26 | North Pacific, Midway Islands | 0130–0501Z daily 14–20 Nov | T+2:45–6:16 | early Hawaii, orbit 2: in the area T+2:46:02, splash T+3:08:19 (also orbit 3) |
 | HYDROPAC 3254/26 | South Pacific, French Polynesia to west of Chile | 0812–1137Z daily 14–20 Nov | T+9:27–12:52 | Chile, orbit 7: in the area T+9:26:44, landing T+9:49:46 (also orbit 8) |
@@ -148,9 +167,11 @@ URL state: `?profile=starship-275&mission=flt15-rtls&t0=22:45:00&met=81000&cam=-
   not a measurement.
 - The ascent and Super Heavy profiles are shaped, not flown: they are consistent at their ends (pad, MECO state,
   SECO state, tower) and plausible in between.
-- The descents reuse one calibrated vehicle and constant-bank steering; SpaceX's guidance varies the bank, and the real
-  corridor over land will differ by tens of km. Overflight distances are indicative. The final approach is a kinematic
-  re-shaping inside the published catch area, not a flown trajectory. Each contingency window covers a second pass one
+- The descents reuse one calibrated vehicle and constant-bank steering (two bank angles for the nominal); SpaceX's
+  guidance varies the bank continuously. The nominal follows the published Mexican corridor's centreline, which is an
+  assumption: the real path can be anywhere inside it, and over Texas no notice constrains the model. Overflight
+  distances are indicative. The final approach is a kinematic re-shaping through the published areas, not a flown
+  trajectory. Each contingency window covers a second pass one
   orbit later that is not modeled.
 - Sunlight is geometric (DE440s, WGS-84); plume visibility, weather and extinction are not modeled.
 - The page's performance was checked on this Mac's GPU and on software GL only, at phone screen size for phones.
@@ -160,9 +181,10 @@ URL state: `?profile=starship-275&mission=flt15-rtls&t0=22:45:00&met=81000&cam=-
 ```sh
 P=~/.venvs/astro313/bin/python
 $P work/flt15_orbit.py                 # orbit, ascent, booster report
-$P work/flt15_descents.py --solve      # five descents (about 10 min); period scale written to work/phase.json
+$P work/flt15_descents.py --solve      # five descents (about 15 min); period scale written to work/phase.json
+                                       # (--corridor redoes only the nominal's corridor stage, about 4 min)
 $P work/flt15_tle.py                   # TLE (after the descents, it uses the period scale)
-$P work/flt15_map.py                   # the two maps
+$P work/flt15_map.py                   # the three maps
 $P work/flt15_export.py                # export/*.json
 SK=~/.claude/skills/launch-page/scripts
 rm -rf docs && $P $SK/new_page.py . --mission export/flt15-rtls.json --id flt15-rtls --label "Flight 15 · ship catch at Starbase" \

@@ -1,0 +1,43 @@
+solving nominal, corridor stage ...
+    start [6.9000e-02 1.1000e+01 2.7000e+01 8.0346e+04] -> dv 69.348 m/s bank 11.32 -> 27.13 at T+22:19:07; catch -0.002 s, routed distance +0.027 km, corridor offsets [-15 -13 -13  -8  -4  -1   1   9   4   5   4   2   4   3   6   6   4   1
+  -3  -8] km, cost 9.00
+    start [6.9000e-02 7.0000e+00 2.6000e+01 8.0236e+04] -> dv 69.348 m/s bank 11.17 -> 27.10 at T+22:19:00; catch +0.003 s, routed distance -0.006 km, corridor offsets [-14 -13 -13  -8  -4  -1   1   9   4   5   5   3   4   3   6   6   4   0
+  -3  -8] km, cost 9.01
+  nominal: {'dv': 0.06934776251478064, 'sigma': 11.321469229486175, 't_rev': 80346.6444372772, 't_burn': 77757.0, 'lb_dur': 18.0, 'period_scale': 0.0013382650863768587, 'direct': {'dv': 0.0691801012205067, 'sigma': 19.969182936542214}, 'sigma2': 27.125813578604728}
+  sampled nominal: 1699 pts, splash T+22:32:34
+hawaii1  dv  71.0 m/s bank   19.5 deg rev - | burn T+02:12:42 @ -30.6,23.0 | 120 km T+02:38:42 @ 10.6,117.7 | peak heat T+02:53:23 71.5 km | max 1.7 g T+03:04:25 | M5 T+03:03:59 transonic T+03:05:44 subsonic T+03:05:56 LB T+03:08:00 | end T+03:08:19 @ 25.499,-155.428 in zone True
+          in HYDROPAC 3257/26 from T+02:46:02 (79 km) to T+03:08:19; window 0130-0501Z = T+02:45:00-T+06:16:00 after a 22:45Z launch, T+01:30:00-T+05:01:00 after 00:00Z
+chile    dv  71.2 m/s bank   -0.3 deg rev - | burn T+08:53:00 @ 30.5,86.5 | 120 km T+09:18:56 @ -4.4,-175.6 | peak heat T+09:33:46 72.2 km | max 1.64 g T+09:45:45 | M5 T+09:45:23 transonic T+09:47:11 subsonic T+09:47:23 LB T+09:49:27 | end T+09:49:46 @ -29.900,-86.900 in zone True
+          in HYDROPAC 3254/26 from T+09:26:44 (81 km) to T+09:49:46; window 0812-1137Z = T+09:27:00-T+12:52:00 after a 22:45Z launch, T+08:12:00-T+11:37:00 after 00:00Z
+hawaii2  dv  69.0 m/s bank   19.3 deg rev - | burn T+22:57:47 @ -25.4,20.5 | 120 km T+23:24:11 @ -8.3,126.5 | peak heat T+23:38:50 71.5 km | max 1.7 g T+23:49:58 | M5 T+23:49:32 transonic T+23:51:17 subsonic T+23:51:29 LB T+23:53:32 | end T+23:53:51 @ 25.499,-155.428 in zone True
+          in HYDROPAC 3256/26 from T+23:32:25 (81 km) to T+23:53:51; window 2217-0144Z = T+23:32:00-T+26:59:00 after a 22:45Z launch, T+22:17:00-T+25:44:00 after 00:00Z
+indian   dv   0.0 m/s bank   82.2 deg rev T+00:51:28 | burn - @ 20.8,-81.8 | 120 km T+00:45:58 @ -29.1,58.8 | peak heat T+00:51:04 55.7 km | max 5.7 g T+00:52:37 | M5 T+00:53:15 transonic T+00:54:05 subsonic T+00:54:18 LB T+00:55:57 | end T+00:56:16 @ -21.374,84.933 in zone True
+          in HYDROPAC 3244/26 from T+00:48:57 (81 km) to T+00:56:16; window 2253-0114Z = T+00:08:00-T+02:29:00 after a 22:45Z launch, T+-2:53:00-T+01:14:00 after 00:00Z
+nominal  dv  69.3 m/s bank   11.3 deg then 27.1 deg from T+22:19:07 period scale +0.00134 (T_nodal 89.629 min) rev - | burn T+21:35:57 @ -30.7,76.4 | 120 km T+22:02:23 @ 7.6,174.7 | peak heat T+22:17:39 72.4 km | max 1.78 g T+22:28:37 | M5 T+22:28:18 transonic T+22:30:00 subsonic T+22:30:12 LB T+22:32:16 | end T+22:32:34 @ 25.997,-97.154 in zone True
+          altitude at the official entry T+22:10:46: 81.9 km
+          in NAVAREA IV 1081/26 from T+22:27:57 (44 km) to T+22:32:34; window 2108-0014Z = T+22:23:00-T+25:29:00 after a 22:45Z launch, T+21:08:00-T+24:14:00 after 00:00Z
+          near Lihue (Kauai)              79.1 km at T+22:09:39  alt 79.6 km
+          near Honolulu                   51.5 km at T+22:09:55  alt 80.0 km
+          near Hilo                      325.7 km at T+22:10:23  alt 80.9 km
+          near Hermosillo                 94.8 km at T+22:21:59  alt 64.9 km
+          near Chihuahua                  78.1 km at T+22:23:33  alt 61.6 km
+          near Ciudad Juarez / El Paso   255.1 km at T+22:23:13  alt 62.1 km
+          near Monterrey                 250.8 km at T+22:26:23  alt 51.2 km
+          near Laredo                     31.4 km at T+22:26:23  alt 51.2 km
+          near Monclova                  154.4 km at T+22:25:35  alt 54.9 km
+          near Reynosa / McAllen         108.9 km at T+22:27:51  alt 44.2 km
+          near Harlingen                  58.5 km at T+22:28:09  alt 42.4 km
+          near Brownsville                36.2 km at T+22:32:34  alt 0.0 km
+          near South Padre Island         11.6 km at T+22:30:03  alt 22.0 km
+          near Corpus Christi             93.5 km at T+22:27:25  alt 46.5 km
+          near Raymondville               42.3 km at T+22:27:55  alt 43.8 km
+          near Port Mansfield             11.3 km at T+22:28:07  alt 42.6 km
+          near Piedras Negras / Eagle Pass   63.0 km at T+22:25:41  alt 54.4 km
+          near Nuevo Laredo               33.8 km at T+22:26:23  alt 51.2 km
+          near Ojinaga / Presidio         56.6 km at T+22:24:05  alt 60.6 km
+nominal in NOTAM B4288/26 C2 from T+22:19:27 (-120.04, 30.08, 72 km) to T+22:22:39 (-108.65, 29.70, 63 km); window 2056-0014Z = T+22:11:00-T+25:29:00 after a 22:45Z launch, T+20:56:00-T+24:14:00 after 00:00Z
+nominal in NOTAM B4288/26 C3 from T+22:22:41 (-108.55, 29.69, 63 km) to T+22:26:05 (-99.96, 27.95, 53 km); window 2056-0014Z = T+22:11:00-T+25:29:00 after a 22:45Z launch, T+20:56:00-T+24:14:00 after 00:00Z
+  offset from the corridor centreline (km, + north) / half-width, every 1 deg from 119.5 W to 100.5 W:
+    -15/36 -13/38 -13/40 -8/37 -4/33 -1/29 +1/25 +9/29 +4/20 +5/20 +4/20 +2/20 +4/19 +3/19 +6/17 +6/19 +4/19 +1/20 -1/16 -2/11
+  re-shaped from T+22:24:29 (770 km to go, route/simulated x1.0000); the un-routed simulation ends at 26.014 N 96.418 W
+nominal vs official: transonic T+22:30:00 vs T+22:29:34, subsonic T+22:30:12 vs T+22:30:13, landing burn T+22:32:16 vs T+22:32:16, catch T+22:32:34 vs T+22:32:34

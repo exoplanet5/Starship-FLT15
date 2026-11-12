@@ -1,5 +1,6 @@
 """Hazard areas for the Flight 15 page and maps: the Flight 15 navigational warnings in ../navwarning (NGA text as issued
-7-9 Nov 2026) parsed into polygons, with their published daily windows (HHMM UTC).
+7-9 Nov 2026, and the Mexican NOTAM for the ship's return, cached 12 Nov) parsed into polygons, with their published daily
+windows (HHMM UTC).
 
   NAVAREA IV 1080/26 A, B   launch, Gulf of America and Yucatan Channel; booster return      2245-0040Z 13 Nov, daily 14-19 Nov
   NAVAREA IV 1081/26        ship catch: Laguna Madre, Padre Island and the Gulf off Starbase  2108-0014Z 14-15 Nov, daily 15-20 Nov
@@ -8,6 +9,9 @@
   HYDROPAC 3254/26          South Pacific west of Chile: mid-mission, orbits 7-8              0812-1137Z daily 14-20 Nov
   HYDROPAC 3256/26          North Pacific, Micronesia to north-east of Hawaii: late Hawaii,   2217-0144Z daily 14-20 Nov
                             the pass after the Starbase pass (orbit 16) and the next one
+  NOTAM B4288/26 C2, C3     Mexico FIR (MMFR), SFC-UNL: the ship's entry corridor from the Pacific      2056-0014Z daily 14-20 Nov
+                            off Baja California (120.6 W) across northern Mexico to the Rio Grande
+                            north-west of Laredo (99.9 W); it opens at the official entry time
 The dates are the UTC days of each window's opening; the launch window is 13 Nov 22:45-00:00Z, so the 14-20 Nov windows
 belong to launches on 13-19 Nov. Each contingency window opens as the modeled descent enters the area and closes about
 one orbit plus 20 minutes after the first-pass splashdown, i.e. each covers two consecutive passes."""
@@ -46,9 +50,27 @@ def read_warning(path):
                         issued=issued, cancel=cancel, file=Path(path).name))
     return out
 
-AREAS = {a['name']: a for f in sorted(NAV.iterdir()) if f.is_file() and not f.suffix and f.name != 'README.md' for a in read_warning(f)}
+_NPAIR = re.compile(r'(\d{2})(\d{2})([NS])\s+(\d{3})(\d{2})([EW])')
+def read_notam(path):
+    """one ICAO NOTAM (items Q, A-G; item E lists 'AREA-xx:' rings of DDMMN DDDMMW points) -> areas like read_warning's.
+    B and C are YYMMDDHHMM, D the daily schedule; a window that closes after midnight ends on C's day, so the last opening is the day before"""
+    txt = Path(path).read_text(); num = txt.split()[0]
+    b = re.search(r'B\)\s*(\d{10})', txt).group(1); c = re.search(r'C\)\s*(\d{10})', txt).group(1); t0, t1 = re.search(r'D\)\s*DLY (\d{4})-(\d{4})', txt).groups()
+    last = int(c[4:6]) - (1 if t1 < t0 else 0); out = []
+    body = txt.split('E)', 1)[1].split('F)', 1)[0]; parts = re.split(r'AREA-(\w+):', body)
+    for sub, chunk in zip(parts[1::2], parts[2::2]):
+        pts = [((-1 if ew == 'W' else 1)*(int(lod) + int(lom)/60), (-1 if ns == 'S' else 1)*(int(lad) + int(lam)/60)) for lad, lam, ns, lod, lom, ew in _NPAIR.findall(chunk)]
+        if pts[0] != pts[-1]: pts.append(pts[0])
+        out.append(dict(name=f'NOTAM {num} {sub}', sub=sub, poly=Polygon(pts), pts=pts, wrap=False, t0=t0, t1=t1, dates=f'daily {int(b[4:6])}-{last} Nov',
+                        issued='', cancel=c[4:], file=Path(path).name, fir=re.search(r'A\)\s*(\w+)', txt).group(1),
+                        lower=re.search(r'F\)\s*(\S+)', txt).group(1), upper=re.search(r'G\)\s*(\S+)', txt).group(1)))
+    return out
+def read_any(path): return read_notam(path) if 'NOTAM' in Path(path).read_text().split('\n', 1)[0] else read_warning(path)
+
+AREAS = {a['name']: a for f in sorted(NAV.iterdir()) if f.is_file() and not f.suffix and f.name != 'README.md' for a in read_any(f)}
 KEYS = {'launchA': 'NAVAREA IV 1080/26 A', 'launchB': 'NAVAREA IV 1080/26 B', 'indian': 'HYDROPAC 3244/26', 'npac1': 'HYDROPAC 3257/26',
-        'chile': 'HYDROPAC 3254/26', 'late': 'HYDROPAC 3256/26', 'catch': 'NAVAREA IV 1081/26'}
+        'chile': 'HYDROPAC 3254/26', 'late': 'HYDROPAC 3256/26', 'catch': 'NAVAREA IV 1081/26',
+        'mexC2': 'NOTAM B4288/26 C2', 'mexC3': 'NOTAM B4288/26 C3'}
 ZD = {k: AREAS[v] for k, v in KEYS.items()}                  # ift14_fit-compatible zone dicts (poly, pts, wrap): F.zcontains, F.crossings work on them
 
 def contains(z, lon, lat):
@@ -89,6 +111,8 @@ add('indian', 'contingency', 'Indian Ocean · no insertion', DANGER, 'Suborbital
 add('npac1', 'contingency', 'N Pacific · early Hawaii', WARN, 'Early-mission contingency: deorbit on orbit 2 (the window also covers orbit 3), splashdown north of Hawaii; the Flight 14 polygon (HYDROPAC 3257/26, 9 Nov 2026)')
 add('chile', 'contingency', 'S Pacific · W of Chile', OK, 'Mid-mission contingency: deorbit on orbit 7 (the window also covers orbit 8), landing several hundred km west of Chile (HYDROPAC 3254/26, 9 Nov 2026)')
 add('late', 'contingency', 'N Pacific · late Hawaii', VIOLET, 'Late-mission contingency on orbit 16, the pass after the Starbase pass (the window also covers orbit 17): entry from Micronesia to a splashdown north-east of Hawaii (HYDROPAC 3256/26, 9 Nov 2026)')
+add('mexC2', 'entry', 'Ship entry · Mexico C2', CYAN, 'Ship return: entry corridor in the Mexico FIR, surface to unlimited, from the Pacific off Baja California across the peninsula, the Gulf of California and Sonora; the ship is at 72 to 63 km (NOTAM B4288/26, area C2)')
+add('mexC3', 'entry', 'Ship entry · Mexico C3', CYAN, 'Ship return: entry corridor in the Mexico FIR, surface to unlimited, across Chihuahua and Coahuila to the Rio Grande north-west of Laredo; the ship is at 63 to 53 km (NOTAM B4288/26, area C3)')
 add('catch', 'landing', 'Ship catch · Starbase', CYAN, 'Ship return: Laguna Madre, Padre Island and the Gulf off Starbase for the final approach and catch; the land corridor is under FAA notices (NAVAREA IV 1081/26, 9 Nov 2026)')
 
 if __name__ == '__main__':

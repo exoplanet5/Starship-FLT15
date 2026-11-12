@@ -30,8 +30,11 @@ def model_track(t_a, t_b, dt_max, color, label, taper=False):
     if taper: h = h - h[0]*(1 - t/T['seco'])**2; h[0] = 0.02          # the ascent starts on the pad (20 m: the engines on the mount, so the first sample is not on the ellipsoid)
     return dict(met0=float(t_a), dt=float(dt), lon=[R6(v) for v in lo], lat=[R6(v) for v in la], alt=[round(max(float(v), 0.0), 4) for v in h], color=color, label=label)
 def uniform_track(tr, dt_max, color, label, dashed=False):
-    """resample a descent (cached, 2 s samples + the landing point) onto a uniform grid, linear in ECEF"""
-    t = np.array(tr['met']); X = np.array([E.ecef(la, lo, h) for lo, la, h in zip(tr['lon'], tr['lat'], tr['alt'])])
+    """resample a descent (cached, 2 s samples + the landing point) onto a uniform grid, linear in ECEF; the nominal ends at the
+    official catch time (its solved end is within a few ms of it, and the page needs the landing burn to end inside the track)"""
+    t = np.array(tr['met'])
+    if abs(t[-1] - T['catch']) < 0.05: t[-1] = T['catch']
+    X = np.array([E.ecef(la, lo, h) for lo, la, h in zip(tr['lon'], tr['lat'], tr['alt'])])
     tt, dt = grid(t[0], t[-1], dt_max); lon, lat, alt = [], [], []
     for q in tt:
         i = int(np.clip(np.searchsorted(t, q) - 1, 0, len(t) - 2)); f = (q - t[i])/(t[i + 1] - t[i])
@@ -92,7 +95,7 @@ NOTES_COMMON = [
     'Ascent: a shaped kinematic profile (Max Q 11.5 km at T+58 s, MECO 66 km and 1.5 km/s at T+2:19, SECO 150 km and 15 deg downrange at T+8:09, the Flight 14 assumptions) that ends on the suborbital coast ellipse in position and velocity. Insertion at T+26:10 is modeled at the burn start as an instantaneous circularisation at apogee.',
     'Super Heavy: 2-D point mass from the MECO state; 36 s boostback (%.0f m/s^2, %.0f m/s), ballistic fall with US76 drag (ballistic coefficient 3400 kg/m^2), 25 s landing burn to rest on the Pad 2 tower, arriving from the Gulf. Apogee %.0f km, %.0f km maximum downrange, %.0f m/s at the landing-burn start. Illustrative: the boostback and landing-burn throttles are not public.' % (B['a_bb'], B['dv_bb'], B['apogee'][1], B['max_downrange'][1], B['v_lb']*1000),
     "Descents: the Starship calibrated on Flight 14's reconstructed entry (3-DOF point mass, rotating WGS-84 Earth, J2, US Standard Atmosphere 1976, modified-Newtonian belly-first aerodynamics with a 55 deg hypersonic angle of attack, L/D 0.70, ballistic coefficient 331 kg/m^2, bank steering that fades out below Mach 1.5, a 10 s one-Raptor deorbit burn). The constant bank is a model choice; SpaceX describes a series of small turns over sparsely populated areas.",
-    'Hazard areas and windows are the Flight 15 navigational warnings issued 7-9 Nov 2026: NAVAREA IV 1080/26 (launch areas A and B, 2245-0040Z), NAVAREA IV 1081/26 (ship catch: Laguna Madre, Padre Island and the Gulf off Starbase, 2108-0014Z on 14-15 Nov), HYDROPAC 3244/26 (Indian Ocean, 2253-0114Z), HYDROPAC 3257/26 (North Pacific, Midway Islands: early Hawaii, 0130-0501Z), HYDROPAC 3254/26 (South Pacific west of Chile, 0812-1137Z), HYDROPAC 3256/26 (North Pacific, Micronesia to north-east of Hawaii: late Hawaii, 2217-0144Z). The 14-20 Nov windows belong to the 13-19 Nov launch dates. Each contingency window opens as the modeled descent enters its area at about 80 km and closes about one orbit plus 20 min after the first-pass splashdown, so each covers two consecutive passes; the model shows the first.',
+    'Hazard areas and windows are the Flight 15 navigational warnings issued 7-9 Nov 2026 and the Mexican NOTAM B4288/26 for the return (areas C2 and C3, surface to unlimited, 2056-0014Z daily from 14 Nov: a corridor 20 to 80 km wide from the Pacific off Baja California to the Rio Grande north-west of Laredo, opening at the official entry time): NAVAREA IV 1080/26 (launch areas A and B, 2245-0040Z), NAVAREA IV 1081/26 (ship catch: Laguna Madre, Padre Island and the Gulf off Starbase, 2108-0014Z on 14-15 Nov), HYDROPAC 3244/26 (Indian Ocean, 2253-0114Z), HYDROPAC 3257/26 (North Pacific, Midway Islands: early Hawaii, 0130-0501Z), HYDROPAC 3254/26 (South Pacific west of Chile, 0812-1137Z), HYDROPAC 3256/26 (North Pacific, Micronesia to north-east of Hawaii: late Hawaii, 2217-0144Z). The 14-20 Nov windows belong to the 13-19 Nov launch dates. Each contingency window opens as the modeled descent enters its area at about 80 km and closes about one orbit plus 20 min after the first-pass splashdown, so each covers two consecutive passes; the model shows the first.',
     'Sunlight: geometric WGS-84 occultation of the Sun centre with JPL DE440s at 60 s cadence. Shifting T0 keeps the Earth-fixed path and moves the Sun. Cities beyond the template list are added for the Americas, the Pacific and the deorbit regions; the sky chart opens on South Padre Island.',
     'Sources: spacex.com/launches/starship-flight-15 and spacex.com/updates (7 Nov 2026) for the timeline, window, catch description and contingency areas; the Flight 14 model at github.com/exoplanet5/Starship-IFT14 for the plane, zones and ship calibration.']
 def ev(met, label, major=False, track=None):
@@ -121,10 +124,17 @@ def zones_for(hit, impact=None):
         q = dict(key=z['key'], id=z['id'], role=z['role'], label=z['label'], color=z['color'], t0=z['t0'], t1=z['t1'], ring=z['ring'], centroid=z['centroid'], desc=z['desc'])
         if z['key'] == hit and impact is not None: q['impact'] = dict(met=float(impact[0]), lon=R6(impact[1]), lat=R6(impact[2]))
         elif z['role'] == 'launch': q['impact_note'] = 'Ascent overflight'
-        elif z['role'] == 'landing': q['impact_note'] = 'Nominal return'
+        elif z['role'] == 'entry' and hit == 'catch': a, b = CORR[z['key']]; q['impact_note'] = f"Overflight {fmt(a['met'])}–{fmt(b['met'])[2:]}, {a['alt']:.0f}–{b['alt']:.0f} km"
+        elif z['role'] in ('landing', 'entry'): q['impact_note'] = 'Nominal return'
         else: q['impact_note'] = 'Contingency only' if hit == 'catch' else 'Other profile'
         out.append(q)
     return out
+
+def corridor_pass(key):
+    """entry and exit of the nominal descent in one of the Mexican corridor areas: dict(met, lon, lat, alt) each"""
+    n = TR['nominal']; met, lon, lat, alt = map(np.array, (n['met'], n['lon'], n['lat'], n['alt'])); (a, b), = Z.crossings(Z.ZD[key], met, lon, lat)
+    return [dict(met=float(met[i]), lon=float(lon[i]), lat=float(lat[i]), alt=float(alt[i])) for i in np.searchsorted(met, [a, b])]
+CORR = {k: corridor_pass(k) for k in ('mexC2', 'mexC3')}
 
 def mission(mid, mission_label, menu_label, desc_key, tracks, segments, events, zones, powered, phases, orbit_end, about, notes, met_default=150):
     end = tracks[segments[-1]]['met0'] + (len(tracks[segments[-1]]['lon']) - 1)*tracks[segments[-1]]['dt']
@@ -151,14 +161,17 @@ def descent_phases(tr, final):
     return [dict(until=tr['t_burn'] + D.BURN_S, label='Deorbit burn'), dict(until=tr['t_ei'], label='Entry coast'), dict(until=tr['transonic'], label='Atmospheric entry'),
             dict(until=tr['landing_burn'], label='Approach · belly flop'), dict(until=tr['t_splash'] + 1, label=final)]
 ABOUT = ["Pre-launch model: Flight 14's zone-fitted orbit with the Flight 15 timeline, a Super Heavy return and a 3-DOF entry to the Pad 2 tower; not telemetry.",
-         'Hazard areas and windows are the Flight 15 navigational warnings of 7-9 Nov 2026 (NAVAREA IV 1080/26 and 1081/26, HYDROPAC 3244, 3254, 3256 and 3257/26).',
+         'Hazard areas and windows are the Flight 15 navigational warnings of 7-9 Nov 2026 (NAVAREA IV 1080/26 and 1081/26, HYDROPAC 3244, 3254, 3256 and 3257/26) and the Mexican NOTAM B4288/26 for the entry corridor.',
          'WGS84 geometry · JPL DE440s sunlight.']
 registry = []
 _NO_WINDOW = False
+_n = TR['nominal']; _m = (np.array(_n['met']) > _n['t_ei']) & (np.array(_n['lon']) > -121) & (np.array(_n['lon']) < -99.9)
+CORR_MAX = float(np.abs(D.corridor_offsets(np.array(_n['lon'])[_m], np.array(_n['lat'])[_m])).max())
 # ---- nominal: return to launch site
 n = TR['nominal']
 tracks = dict(ascent=ASCENT, coast=COAST, orbit=orbit_track(T['deorb0']), descent=DESC['nominal'], booster=BOOSTER, **{k: DASHED[k] for k in ['indian', 'hawaii1', 'chile', 'hawaii2']})
 events = official_events(1e9) + [ev(n['t_ei'], '120 km (model)'), ev(n['peak_heating'], f"Peak heating, {n['peak_heating_alt']:.0f} km (model)"), ev(n['t_max_g'], f"Max deceleration {n['max_g']:.1f} g (model)"),
+                                  ev(CORR['mexC2'][0]['met'], f"Enters the Mexican corridor off Baja California, {CORR['mexC2'][0]['alt']:.0f} km (model)"), ev(CORR['mexC3'][1]['met'], f"Crosses the Rio Grande into Texas, {CORR['mexC3'][1]['alt']:.0f} km (model)"),
                                   ev(TR['indian']['t_splash'], 'Indian Ocean splashdown (contingency)', False, 'indian'), ev(TR['hawaii1']['t_splash'], 'Early Hawaii splashdown (contingency)', False, 'hawaii1'),
                                   ev(TR['chile']['t_splash'], 'Chile splashdown (contingency)', False, 'chile')]
 powered = POW_ASC + [[T['deorb0'], T['deorb1']], [T['lb'], T['catch']]]
@@ -166,8 +179,8 @@ phases = PH_ASC + [dict(until=T['deorb0'], label='Orbit coast'), dict(until=T['d
                    dict(until=T['lb'], label='Approach · belly flop'), dict(until=T['catch'] + 1, label='Landing burn · catch')]
 registry.append(mission('flt15-rtls', 'Ship catch at Starbase', 'Flight 15 · ship catch at Starbase', 'nominal', tracks, ['ascent', 'coast', 'orbit', 'descent'], events,
                         zones_for('catch', (T['catch'], O.TOWER[0], O.TOWER[1])), powered, phases, T['deorb0'], ABOUT, NOTES_COMMON + [
-    "Return: deorbit burn %.1f m/s at T+21:35:57 over the southern Indian Ocean, bank %.1f deg toward the south (the orbital pass runs about 400 km north of Starbase). 120 km at %s, 80 km at the official 'entry' time, peak heating %.0f km, %.1f g maximum. The pass crosses the Kauai Channel at about 80 km and northern Mexico at 60-50 km." % (SOL['nominal']['dv']*1000, SOL['nominal']['sigma'], fmt(n['t_ei']), n['peak_heating_alt'], n['max_g']),
-    "Final approach from %s (the last %.0f km): the ground path is re-shaped to SpaceX's description and the ship-catch hazard area NAVAREA IV 1081/26, whose northern tip is at 26.77 N on the Laguna Madre: over the lagoon 65 km north of the South Padre Island town heading south-east, out over the Gulf to 36 km north-east of the tower, a final turn south-west to the tower. The simulation's arc length is kept (horizontal spacing stretched x%.2f), so heights, speeds and times are unchanged; the simulation's own constant-bank path would reach the tower directly from the west-north-west over Harlingen." % (fmt(n['overlay_from']), D.START_KM, n['overlay_stretch'])]))
+    "Return: deorbit burn %.1f m/s at T+21:35:57 over the southern Indian Ocean; the orbital pass runs about 400 km north of Starbase and the ship banks south, %.0f deg until %s and %.0f deg after, solved so that the path follows the Mexican entry corridor of NOTAM B4288/26 (within %.0f km of its centreline, in it from %s at %.0f km to %s at %.0f km) and reaches the tower at the official catch time. 120 km at %s, %.0f km at the official 'entry' time, peak heating %.0f km, %.1f g maximum. The pass crosses the Kauai Channel at about 80 km. The orbit is the one solved earlier with a single %.0f deg bank straight to the tower; that path ran 50 to 70 km south of the corridor." % (SOL['nominal']['dv']*1000, SOL['nominal']['sigma'], fmt(SOL['nominal']['t_rev']), SOL['nominal']['sigma2'], CORR_MAX, fmt(CORR['mexC2'][0]['met']), CORR['mexC2'][0]['alt'], fmt(CORR['mexC3'][1]['met']), CORR['mexC3'][1]['alt'], fmt(n['t_ei']), n['alt_at_official_entry'], n['peak_heating_alt'], n['max_g'], SOL['nominal']['direct']['sigma']),
+    "Final approach: from %s (%.1f W, %.0f km to go) the ground path is re-shaped to the published areas and SpaceX's description: out of Mexico through the middle of the corridor's east end on the Rio Grande, %.0f km north-west of Laredo, across south Texas to the Laguna Madre 57 km north of the South Padre Island town heading south-east (the ship-catch area NAVAREA IV 1081/26 has its northern tip at 26.77 N), out over the Gulf to 36 km north-east of the tower, a final turn south-west to the tower. The simulation flies this routed distance, so heights, speeds, times and the spacing along the path are its own; only the turns of the last minutes are drawn rather than simulated. No notice for the Texas part is in the model." % (fmt(n['overlay_from']), -D.START_LON, n['overlay_km'], F.gc_dist_deg(D.W_BORDER[1], D.W_BORDER[0], -99.51, 27.51)*111.2)]))
 # ---- contingencies
 def contingency(mid, mission_label, menu_label, key, burn_label, land_label, land_point, extra_notes):
     tr = TR[key]; t_burn = tr['t_burn'] if tr['t_burn'] is not None else T['ins0']
